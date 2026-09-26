@@ -101,6 +101,7 @@ intelligent-teaching-platform/
 mysql -u root -p < sql/ry_20260417.sql
 mysql -u root -p < sql/quartz.sql
 mysql -u root -p < sql/itp_business.sql
+mysql -u root -p < sql/itp_menu.sql   # 角色（教师/学生）与管理员端菜单
 
 # 2. 修改后端配置 ruoyi-admin/src/main/resources/application-druid.yml（数据库密码）
 #    及 application.yml（Redis 配置）
@@ -125,8 +126,8 @@ python ai_server.py
 ## 开发计划
 
 - [x] 阶段0：环境准备 + 仓库初始化 + 若依基线跑通
-- [ ] 阶段1：数据库业务表设计 + 代码生成
-- [ ] 阶段2：管理员端
+- [x] 阶段1：数据库业务表设计 + 代码生成
+- [x] 阶段2：管理员端
 - [ ] 阶段3：教师端
 - [ ] 阶段4：学生端（10 大模块协同编辑）
 - [ ] 阶段5：系统引擎（封面/PDF/合规预检）

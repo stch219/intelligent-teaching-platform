@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】学生管理 Mapper 映射文件（表 te_student，联查 sys_user/te_class/te_group）
+     【说明】学生账号复用 sys_user（u），扩展表 te_student（s），
+             列表联查班级名、组名；层级树用 UNION ALL 组装"班级→小组"两级节点
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeStudentMapper">
+
+    <!-- 结果映射：联查字段 → TeStudent 实体 -->
+    <resultMap type="TeStudent" id="TeStudentResult">
+        <id     property="userId"         column="user_id"         />
+        <result property="studentNo"      column="student_no"      />
+        <result property="classId"        column="class_id"        />
+        <result property="groupId"        column="group_id"        />
+        <result property="roleType"       column="role_type"       />
+        <result property="dutyAssignment" column="duty_assignment" />
+        <result property="dutyStatus"     column="duty_status"     />
+        <result property="userName"       column="user_name"       />
+        <result property="nickName"       column="nick_name"       />
+        <result property="phonenumber"    column="phonenumber"     />
+        <result property="status"         column="status"          />
+        <result property="className"      column="class_name"      />
+        <result property="groupName"      column="group_name"      />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateTime"     column="update_time"     />
+    </resultMap>
+
+    <!-- 通用联查语句：扩展表连系统用户表、班级表、小组表 -->
+    <sql id="selectTeStudentVo">
+        select s.user_id, s.student_no, s.class_id, s.group_id, s.role_type,
+               s.duty_assignment, s.duty_status, u.user_name, u.nick_name,
+               u.phonenumber, u.status, c.class_name, g.group_name,
+               s.create_time, s.update_time
+        from te_student s
+        left join sys_user u on u.user_id = s.user_id
+        left join te_class c on c.id = s.class_id
+        left join te_group g on g.id = s.group_id
+    </sql>
+
+    <!-- 条件查询学生列表（班级/小组精确，姓名学号模糊） -->
+    <select id="selectTeStudentList" parameterType="TeStudent" resultMap="TeStudentResult">
+        <include refid="selectTeStudentVo"/>
+        <where>
+            <if test="classId != null">
+                and s.class_id = #{classId}
+            </if>
+            <if test="groupId != null">
+                and s.group_id = #{groupId}
+            </if>
+            <if test="nickName != null and nickName != ''">
+                and u.nick_name like concat('%', #{nickName}, '%')
+            </if>
+            <if test="studentNo != null and studentNo != ''">
+                and s.student_no like concat('%', #{studentNo}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and u.status = #{status}
+            </if>
+        </where>
+        order by s.class_id, s.group_id, s.student_no
+    </select>
+
+    <!-- 按用户ID查询学生详情 -->
+    <select id="selectTeStudentByUserId" parameterType="Long" resultMap="TeStudentResult">
+        <include refid="selectTeStudentVo"/>
+        where s.user_id = #{userId}
+    </select>
+
+    <!-- 按学号查询学生（导入判重） -->
+    <select id="selectTeStudentByNo" parameterType="String" resultMap="TeStudentResult">
+        <include refid="selectTeStudentVo"/>
+        where s.student_no = #{studentNo}
+    </select>
+
+    <!-- 班级→小组层级树：一级班级节点 + 二级小组节点 -->
+    <select id="selectClassGroupTree" resultType="java.util.HashMap">
+        select c.id as id, c.class_name as label, 1 as level, 0 as parentId
+        from te_class c
+        union all
+        select g.id as id, g.group_name as label, 2 as level, g.class_id as parentId
+        from te_group g
+        order by level, id
+    </select>
+
+    <!-- 按班级名称查班级ID（注册审批/导入匹配） -->
+    <select id="selectClassIdByName" parameterType="String" resultType="Long">
+        select id from te_class where class_name = #{className} limit 1
+    </select>
+
+    <!-- 按班级ID+组序号查小组ID（导入时"第N组"匹配） -->
+    <select id="selectGroupIdByOrder" parameterType="java.util.HashMap" resultType="Long">
+        select id from te_group where class_id = #{classId} and group_order = #{groupOrder} limit 1
+    </select>
+
+    <!-- 新增学生扩展记录 -->
+    <insert id="insertTeStudent" parameterType="TeStudent">
+        insert into te_student
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="studentNo != null and studentNo != ''">student_no,</if>
+            <if test="classId != null">class_id,</if>
+            <if test="groupId != null">group_id,</if>
+            <if test="roleType != null">role_type,</if>
+            <if test="dutyAssignment != null">duty_assignment,</if>
+            <if test="dutyStatus != null">duty_status,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="studentNo != null and studentNo != ''">#{studentNo},</if>
+            <if test="classId != null">#{classId},</if>
+            <if test="groupId != null">#{groupId},</if>
+            <if test="roleType != null">#{roleType},</if>
+            <if test="dutyAssignment != null">#{dutyAssignment},</if>
+            <if test="dutyStatus != null">#{dutyStatus},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <!-- 修改学生扩展记录 -->
+    <update id="updateTeStudent" parameterType="TeStudent">
+        update te_student
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="studentNo != null and studentNo != ''">student_no = #{studentNo},</if>
+            <if test="classId != null">class_id = #{classId},</if>
+            <if test="groupId != null">group_id = #{groupId},</if>
+            <if test="roleType != null">role_type = #{roleType},</if>
+            <if test="dutyAssignment != null">duty_assignment = #{dutyAssignment},</if>
+            <if test="dutyStatus != null">duty_status = #{dutyStatus},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where user_id = #{userId}
+    </update>
+
+    <!-- 批量删除学生扩展记录 -->
+    <delete id="deleteTeStudentByUserIds" parameterType="Long">
+        delete from te_student where user_id in
+        <foreach collection="array" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+</mapper>

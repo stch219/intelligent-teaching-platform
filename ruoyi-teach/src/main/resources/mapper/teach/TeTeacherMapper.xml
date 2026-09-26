@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】教师管理 Mapper 映射文件（表 te_teacher，联查 sys_user / te_class）
+     【说明】教师账号复用 sys_user（u），扩展表 te_teacher（t），
+             列表联查账号信息并用子查询统计指导班级数（删除校验展示）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeTeacherMapper">
+
+    <!-- 结果映射：联查字段 → TeTeacher 实体 -->
+    <resultMap type="TeTeacher" id="TeTeacherResult">
+        <id     property="userId"      column="user_id"      />
+        <result property="userName"    column="user_name"    />
+        <result property="nickName"    column="nick_name"    />
+        <result property="title"       column="title"        />
+        <result property="phonenumber" column="phonenumber"  />
+        <result property="email"       column="email"        />
+        <result property="status"      column="status"       />
+        <result property="classCount"  column="class_count"  />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <!-- 通用联查语句：扩展表左连系统用户表，子查询统计指导班级数 -->
+    <sql id="selectTeTeacherVo">
+        select t.user_id, u.user_name, u.nick_name, t.title, u.phonenumber,
+               u.email, u.status, t.create_time, t.update_time, t.remark,
+               (select count(1) from te_class c where c.teacher_id = t.user_id) as class_count
+        from te_teacher t
+        left join sys_user u on u.user_id = t.user_id
+    </sql>
+
+    <!-- 条件查询教师列表（姓名模糊/账号/状态） -->
+    <select id="selectTeTeacherList" parameterType="TeTeacher" resultMap="TeTeacherResult">
+        <include refid="selectTeTeacherVo"/>
+        <where>
+            <if test="nickName != null and nickName != ''">
+                and u.nick_name like concat('%', #{nickName}, '%')
+            </if>
+            <if test="userName != null and userName != ''">
+                and u.user_name like concat('%', #{userName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and u.status = #{status}
+            </if>
+        </where>
+        order by t.create_time desc
+    </select>
+
+    <!-- 按用户ID查询教师详情 -->
+    <select id="selectTeTeacherByUserId" parameterType="Long" resultMap="TeTeacherResult">
+        <include refid="selectTeTeacherVo"/>
+        where t.user_id = #{userId}
+    </select>
+
+    <!-- 统计教师总数（上限4校验） -->
+    <select id="countTeTeacher" resultType="int">
+        select count(1) from te_teacher
+    </select>
+
+    <!-- 统计教师指导班级数（仅可删除无指导班级的教师） -->
+    <select id="countClassByTeacher" parameterType="Long" resultType="int">
+        select count(1) from te_class where teacher_id = #{userId}
+    </select>
+
+    <!-- 新增教师扩展记录 -->
+    <insert id="insertTeTeacher" parameterType="TeTeacher">
+        insert into te_teacher
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="title != null">title,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="title != null">#{title},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <!-- 修改教师扩展记录 -->
+    <update id="updateTeTeacher" parameterType="TeTeacher">
+        update te_teacher
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="title != null">title = #{title},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where user_id = #{userId}
+    </update>
+
+    <!-- 批量删除教师扩展记录 -->
+    <delete id="deleteTeTeacherByUserIds" parameterType="Long">
+        delete from te_teacher where user_id in
+        <foreach collection="array" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+</mapper>

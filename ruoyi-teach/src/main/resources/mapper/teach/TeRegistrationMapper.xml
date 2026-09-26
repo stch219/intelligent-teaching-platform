@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】学生注册审批 Mapper 映射文件（表 te_registration）
+     【说明】提供注册申请的条件查询、详情、学号判重、新增、审批更新、批量删除
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeRegistrationMapper">
+
+    <!-- 结果映射：数据库下划线字段 → 实体驼峰属性 -->
+    <resultMap type="TeRegistration" id="TeRegistrationResult">
+        <id     property="id"           column="id"            />
+        <result property="userId"       column="user_id"       />
+        <result property="realName"     column="real_name"     />
+        <result property="studentNo"    column="student_no"    />
+        <result property="className"    column="class_name"    />
+        <result property="phone"        column="phone"         />
+        <result property="status"       column="status"        />
+        <result property="approveBy"    column="approve_by"    />
+        <result property="approveTime"  column="approve_time"  />
+        <result property="rejectReason" column="reject_reason" />
+        <result property="createTime"   column="create_time"   />
+    </resultMap>
+
+    <!-- 通用查询条件片段 -->
+    <sql id="selectTeRegistrationVo">
+        select id, user_id, real_name, student_no, class_name, phone, status,
+               approve_by, approve_time, reject_reason, create_time
+        from te_registration
+    </sql>
+
+    <!-- 条件查询申请列表（姓名模糊/学号/班级/状态） -->
+    <select id="selectTeRegistrationList" parameterType="TeRegistration" resultMap="TeRegistrationResult">
+        <include refid="selectTeRegistrationVo"/>
+        <where>
+            <if test="realName != null and realName != ''">
+                and real_name like concat('%', #{realName}, '%')
+            </if>
+            <if test="studentNo != null and studentNo != ''">
+                and student_no = #{studentNo}
+            </if>
+            <if test="className != null and className != ''">
+                and class_name like concat('%', #{className}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <!-- 按申请ID查询详情 -->
+    <select id="selectTeRegistrationById" parameterType="Long" resultMap="TeRegistrationResult">
+        <include refid="selectTeRegistrationVo"/>
+        where id = #{id}
+    </select>
+
+    <!-- 学号判重（同号存在未通过的申请则不允许重复提交） -->
+    <select id="checkStudentNoExists" parameterType="String" resultType="int">
+        select count(1) from te_registration
+        where student_no = #{studentNo} and status = 0
+    </select>
+
+    <!-- 新增注册申请 -->
+    <insert id="insertTeRegistration" parameterType="TeRegistration" useGeneratedKeys="true" keyProperty="id">
+        insert into te_registration
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="realName != null and realName != ''">real_name,</if>
+            <if test="studentNo != null and studentNo != ''">student_no,</if>
+            <if test="className != null and className != ''">class_name,</if>
+            <if test="phone != null">phone,</if>
+            <if test="status != null">status,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="realName != null and realName != ''">#{realName},</if>
+            <if test="studentNo != null and studentNo != ''">#{studentNo},</if>
+            <if test="className != null and className != ''">#{className},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <!-- 审批更新（通过回填 user_id；驳回写原因） -->
+    <update id="updateTeRegistration" parameterType="TeRegistration">
+        update te_registration
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="realName != null and realName != ''">real_name = #{realName},</if>
+            <if test="studentNo != null and studentNo != ''">student_no = #{studentNo},</if>
+            <if test="className != null and className != ''">class_name = #{className},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="approveBy != null">approve_by = #{approveBy},</if>
+            <if test="approveTime != null">approve_time = #{approveTime},</if>
+            <if test="rejectReason != null">reject_reason = #{rejectReason},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除申请 -->
+    <delete id="deleteTeRegistrationByIds" parameterType="Long">
+        delete from te_registration where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -70,3 +70,6 @@ Thumbs.db
 logs/
 *.swp
 rebel.xml
+
+# 编辑器配置
+.vscode/
