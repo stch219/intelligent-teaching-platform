@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】模块赋分 Mapper 映射文件（表 te_module_score_set，唯一键 class_id+module_code）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeModuleScoreSetMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeModuleScoreSet" id="TeModuleScoreSetResult">
+        <id     property="id"         column="id"          />
+        <result property="classId"    column="class_id"    />
+        <result property="moduleCode" column="module_code" />
+        <result property="score"      column="score"       />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <!-- 查询班级下赋分设置 -->
+    <select id="selectByClassId" parameterType="Long" resultMap="TeModuleScoreSetResult">
+        select id, class_id, module_code, score, create_time, update_time
+        from te_module_score_set
+        where class_id = #{classId}
+        order by module_code
+    </select>
+
+    <!-- 保存赋分：唯一键冲突时更新（upsert） -->
+    <insert id="upsert" parameterType="TeModuleScoreSet">
+        insert into te_module_score_set (class_id, module_code, score, create_time, update_time)
+        values (#{classId}, #{moduleCode}, #{score}, #{createTime}, #{updateTime})
+        on duplicate key update
+            score       = #{score},
+            update_time = #{updateTime}
+    </insert>
+
+    <!-- 删除班级下全部赋分 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_module_score_set where class_id = #{classId}
+    </delete>
+
+</mapper>

@@ -77,6 +77,22 @@ export const constantRoutes = [
     meta: { title: '锁定屏幕' }
   },
   {
+    // 教师端独立门户（不走若依后台 Layout，顶栏式布局，静态路由无需后端菜单）
+    path: '/teacher',
+    component: () => import('@/views/portal/teacher/layout'),
+    hidden: true,
+    redirect: '/teacher/index',
+    children: [
+      { path: 'index', component: () => import('@/views/portal/teacher/index'), name: 'TeacherHome', meta: { title: '教师工作台' } },
+      { path: 'class', component: () => import('@/views/portal/teacher/class/index'), name: 'TeacherClass', meta: { title: '班级与分组' } },
+      { path: 'task', component: () => import('@/views/portal/teacher/task/index'), name: 'TeacherTask', meta: { title: '任务管理' } },
+      { path: 'module', component: () => import('@/views/portal/teacher/module/index'), name: 'TeacherModule', meta: { title: '模块设置' } },
+      { path: 'material', component: () => import('@/views/portal/teacher/material/index'), name: 'TeacherMaterial', meta: { title: '资料发布' } },
+      { path: 'warning', component: () => import('@/views/portal/teacher/warning/index'), name: 'TeacherWarning', meta: { title: '预警规则' } },
+      { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分' } }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     hidden: true,

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】小组管理 Mapper 映射文件（表 te_group）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeGroupMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeGroup" id="TeGroupResult">
+        <id     property="id"           column="id"            />
+        <result property="groupName"    column="group_name"    />
+        <result property="groupOrder"   column="group_order"   />
+        <result property="classId"      column="class_id"      />
+        <result property="colorCode"    column="color_code"    />
+        <result property="submitStatus" column="submit_status" />
+        <result property="submitTime"   column="submit_time"   />
+        <result property="finalPdf"     column="final_pdf"     />
+        <result property="aiRefScore"   column="ai_ref_score"  />
+        <result property="teacherScore" column="teacher_score" />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <!-- 查询班级下小组列表（按组序号排序） -->
+    <select id="selectByClassId" parameterType="Long" resultMap="TeGroupResult">
+        select id, group_name, group_order, class_id, color_code, submit_status,
+               submit_time, final_pdf, ai_ref_score, teacher_score, create_time, update_time
+        from te_group
+        where class_id = #{classId}
+        order by group_order
+    </select>
+
+    <!-- 按ID查询小组 -->
+    <select id="selectById" parameterType="Long" resultMap="TeGroupResult">
+        select id, group_name, group_order, class_id, color_code, submit_status,
+               submit_time, final_pdf, ai_ref_score, teacher_score, create_time, update_time
+        from te_group
+        where id = #{id}
+    </select>
+
+    <!-- 统计班级下小组数 -->
+    <select id="countByClassId" parameterType="Long" resultType="int">
+        select count(1) from te_group where class_id = #{classId}
+    </select>
+
+    <!-- 新增小组 -->
+    <insert id="insertTeGroup" parameterType="TeGroup" useGeneratedKeys="true" keyProperty="id">
+        insert into te_group (group_name, group_order, class_id, color_code, create_time)
+        values (#{groupName}, #{groupOrder}, #{classId}, #{colorCode}, #{createTime})
+    </insert>
+
+    <!-- 修改小组 -->
+    <update id="updateTeGroup" parameterType="TeGroup">
+        update te_group
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="groupName != null and groupName != ''">group_name = #{groupName},</if>
+            <if test="submitStatus != null">submit_status = #{submitStatus},</if>
+            <if test="submitTime != null">submit_time = #{submitTime},</if>
+            <if test="finalPdf != null">final_pdf = #{finalPdf},</if>
+            <if test="aiRefScore != null">ai_ref_score = #{aiRefScore},</if>
+            <if test="teacherScore != null">teacher_score = #{teacherScore},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 删除班级下全部小组 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_group where class_id = #{classId}
+    </delete>
+
+</mapper>

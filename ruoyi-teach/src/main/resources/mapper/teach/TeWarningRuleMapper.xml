@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】预警规则 Mapper 映射文件（表 te_warning_rule，每班最多3条）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeWarningRuleMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeWarningRule" id="TeWarningRuleResult">
+        <id     property="id"                column="id"                 />
+        <result property="classId"           column="class_id"           />
+        <result property="level"             column="level"              />
+        <result property="daysBefore"        column="days_before"        />
+        <result property="progressThreshold" column="progress_threshold" />
+        <result property="enabled"           column="enabled"            />
+        <result property="createTime"        column="create_time"        />
+        <result property="className"         column="class_name"         />
+    </resultMap>
+
+    <!-- 查询班级下预警规则（按级别排序） -->
+    <select id="selectByClassId" parameterType="Long" resultMap="TeWarningRuleResult">
+        select r.id, r.class_id, r.level, r.days_before, r.progress_threshold,
+               r.enabled, r.create_time, c.class_name
+        from te_warning_rule r
+        left join te_class c on c.id = r.class_id
+        where r.class_id = #{classId}
+        order by r.level
+    </select>
+
+    <!-- 统计班级下规则数 -->
+    <select id="countByClassId" parameterType="Long" resultType="int">
+        select count(1) from te_warning_rule where class_id = #{classId}
+    </select>
+
+    <!-- 新增规则 -->
+    <insert id="insertTeWarningRule" parameterType="TeWarningRule" useGeneratedKeys="true" keyProperty="id">
+        insert into te_warning_rule (class_id, level, days_before, progress_threshold, enabled, create_time)
+        values (#{classId}, #{level}, #{daysBefore}, #{progressThreshold}, #{enabled}, #{createTime})
+    </insert>
+
+    <!-- 修改规则 -->
+    <update id="updateTeWarningRule" parameterType="TeWarningRule">
+        update te_warning_rule
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="level != null">level = #{level},</if>
+            <if test="daysBefore != null">days_before = #{daysBefore},</if>
+            <if test="progressThreshold != null">progress_threshold = #{progressThreshold},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除规则 -->
+    <delete id="deleteByIds" parameterType="Long">
+        delete from te_warning_rule where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 删除班级下全部规则 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_warning_rule where class_id = #{classId}
+    </delete>
+
+</mapper>

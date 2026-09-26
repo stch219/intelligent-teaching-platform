@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】模块设置 Mapper 映射文件（表 te_module_set，唯一键 class_id+module_code）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeModuleSetMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeModuleSet" id="TeModuleSetResult">
+        <id     property="id"          column="id"           />
+        <result property="classId"     column="class_id"     />
+        <result property="moduleCode"  column="module_code"  />
+        <result property="moduleName"  column="module_name"  />
+        <result property="countType"   column="count_type"   />
+        <result property="minCount"    column="min_count"    />
+        <result property="maxCount"    column="max_count"    />
+        <result property="needFormula" column="need_formula" />
+        <result property="needImage"   column="need_image"   />
+        <result property="needCode"    column="need_code"    />
+        <result property="editable"    column="editable"     />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <!-- 查询班级下全部模块设置 -->
+    <select id="selectByClassId" parameterType="Long" resultMap="TeModuleSetResult">
+        select id, class_id, module_code, module_name, count_type, min_count, max_count,
+               need_formula, need_image, need_code, editable, create_time, update_time
+        from te_module_set
+        where class_id = #{classId}
+        order by module_code
+    </select>
+
+    <!-- 保存模块设置：唯一键冲突时更新（upsert） -->
+    <insert id="upsert" parameterType="TeModuleSet">
+        insert into te_module_set (class_id, module_code, module_name, count_type, min_count, max_count,
+                                   need_formula, need_image, need_code, editable, create_time, update_time)
+        values (#{classId}, #{moduleCode}, #{moduleName}, #{countType}, #{minCount}, #{maxCount},
+                #{needFormula}, #{needImage}, #{needCode}, #{editable}, #{createTime}, #{updateTime})
+        on duplicate key update
+            module_name  = #{moduleName},
+            count_type   = #{countType},
+            min_count    = #{minCount},
+            max_count    = #{maxCount},
+            need_formula = #{needFormula},
+            need_image   = #{needImage},
+            need_code    = #{needCode},
+            editable     = #{editable},
+            update_time  = #{updateTime}
+    </insert>
+
+    <!-- 删除班级下全部模块设置 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_module_set where class_id = #{classId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】学习资料 Mapper 映射文件（表 te_material，联查班级名称）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeMaterialMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeMaterial" id="TeMaterialResult">
+        <id     property="id"           column="id"            />
+        <result property="classId"      column="class_id"      />
+        <result property="materialType" column="material_type" />
+        <result property="fileName"     column="file_name"     />
+        <result property="filePath"     column="file_path"     />
+        <result property="fileSize"     column="file_size"     />
+        <result property="visible"      column="visible"       />
+        <result property="uploadBy"     column="upload_by"     />
+        <result property="uploadTime"   column="upload_time"   />
+        <result property="className"    column="class_name"    />
+    </resultMap>
+
+    <!-- 条件查询资料列表 -->
+    <select id="selectTeMaterialList" parameterType="TeMaterial" resultMap="TeMaterialResult">
+        select m.id, m.class_id, m.material_type, m.file_name, m.file_path, m.file_size,
+               m.visible, m.upload_by, m.upload_time, c.class_name
+        from te_material m
+        left join te_class c on c.id = m.class_id
+        <where>
+            <if test="classId != null">and m.class_id = #{classId}</if>
+            <if test="materialType != null">and m.material_type = #{materialType}</if>
+            <if test="fileName != null and fileName != ''">and m.file_name like concat('%', #{fileName}, '%')</if>
+        </where>
+        order by m.class_id, m.upload_time desc
+    </select>
+
+    <!-- 按ID查询资料 -->
+    <select id="selectTeMaterialById" parameterType="Long" resultMap="TeMaterialResult">
+        select m.id, m.class_id, m.material_type, m.file_name, m.file_path, m.file_size,
+               m.visible, m.upload_by, m.upload_time, c.class_name
+        from te_material m
+        left join te_class c on c.id = m.class_id
+        where m.id = #{id}
+    </select>
+
+    <!-- 新增资料记录 -->
+    <insert id="insertTeMaterial" parameterType="TeMaterial" useGeneratedKeys="true" keyProperty="id">
+        insert into te_material (class_id, material_type, file_name, file_path, file_size, visible, upload_by, upload_time)
+        values (#{classId}, #{materialType}, #{fileName}, #{filePath}, #{fileSize}, #{visible}, #{uploadBy}, #{uploadTime})
+    </insert>
+
+    <!-- 修改资料记录 -->
+    <update id="updateTeMaterial" parameterType="TeMaterial">
+        update te_material
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="fileName != null and fileName != ''">file_name = #{fileName},</if>
+            <if test="visible != null">visible = #{visible},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除资料记录 -->
+    <delete id="deleteTeMaterialByIds" parameterType="Long">
+        delete from te_material where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 删除班级下全部资料 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_material where class_id = #{classId}
+    </delete>
+
+</mapper>

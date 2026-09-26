@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】任务管理 Mapper 映射文件（表 te_task，联查教师姓名/已分配组数）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeTaskMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeTask" id="TeTaskResult">
+        <id     property="id"               column="id"               />
+        <result property="taskCode"         column="task_code"        />
+        <result property="taskName"         column="task_name"        />
+        <result property="classId"          column="class_id"         />
+        <result property="designGoal"       column="design_goal"      />
+        <result property="requirement"      column="requirement"      />
+        <result property="gradingStandard"  column="grading_standard" />
+        <result property="tips"             column="tips"             />
+        <result property="teacherId"        column="teacher_id"       />
+        <result property="createTime"       column="create_time"      />
+        <result property="updateTime"       column="update_time"      />
+        <result property="className"        column="class_name"       />
+        <result property="teacherName"      column="teacher_name"     />
+        <result property="assignedCount"    column="assigned_count"   />
+    </resultMap>
+
+    <!-- 通用查询：联查班级名、教师姓名、已分配组数 -->
+    <sql id="selectTeTaskVo">
+        select t.id, t.task_code, t.task_name, t.class_id, t.design_goal, t.requirement,
+               t.grading_standard, t.tips, t.teacher_id, t.create_time, t.update_time,
+               c.class_name, u.nick_name as teacher_name,
+               (select count(1) from te_task_assign a where a.task_id = t.id) as assigned_count
+        from te_task t
+        left join te_class c on c.id = t.class_id
+        left join sys_user u on u.user_id = t.teacher_id
+    </sql>
+
+    <!-- 条件查询任务列表 -->
+    <select id="selectTeTaskList" parameterType="TeTask" resultMap="TeTaskResult">
+        <include refid="selectTeTaskVo"/>
+        <where>
+            <if test="classId != null">and t.class_id = #{classId}</if>
+            <if test="teacherId != null">and t.teacher_id = #{teacherId}</if>
+            <if test="taskName != null and taskName != ''">and t.task_name like concat('%', #{taskName}, '%')</if>
+        </where>
+        order by t.class_id, t.task_code
+    </select>
+
+    <!-- 按ID查询任务 -->
+    <select id="selectTeTaskById" parameterType="Long" resultMap="TeTaskResult">
+        <include refid="selectTeTaskVo"/>
+        where t.id = #{id}
+    </select>
+
+    <!-- 查询班级下已使用的任务编号集合 -->
+    <select id="selectTaskCodesByClass" parameterType="Long" resultType="String">
+        select task_code from te_task where class_id = #{classId}
+    </select>
+
+    <!-- 新增任务 -->
+    <insert id="insertTeTask" parameterType="TeTask" useGeneratedKeys="true" keyProperty="id">
+        insert into te_task
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskCode != null and taskCode != ''">task_code,</if>
+            <if test="taskName != null and taskName != ''">task_name,</if>
+            <if test="classId != null">class_id,</if>
+            <if test="designGoal != null">design_goal,</if>
+            <if test="requirement != null">requirement,</if>
+            <if test="gradingStandard != null">grading_standard,</if>
+            <if test="tips != null">tips,</if>
+            <if test="teacherId != null">teacher_id,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
+            <if test="taskName != null and taskName != ''">#{taskName},</if>
+            <if test="classId != null">#{classId},</if>
+            <if test="designGoal != null">#{designGoal},</if>
+            <if test="requirement != null">#{requirement},</if>
+            <if test="gradingStandard != null">#{gradingStandard},</if>
+            <if test="tips != null">#{tips},</if>
+            <if test="teacherId != null">#{teacherId},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <!-- 修改任务 -->
+    <update id="updateTeTask" parameterType="TeTask">
+        update te_task
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="taskName != null and taskName != ''">task_name = #{taskName},</if>
+            <if test="designGoal != null">design_goal = #{designGoal},</if>
+            <if test="requirement != null">requirement = #{requirement},</if>
+            <if test="gradingStandard != null">grading_standard = #{gradingStandard},</if>
+            <if test="tips != null">tips = #{tips},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除任务 -->
+    <delete id="deleteTeTaskByIds" parameterType="Long">
+        delete from te_task where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 删除班级下全部任务 -->
+    <delete id="deleteByClassId" parameterType="Long">
+        delete from te_task where class_id = #{classId}
+    </delete>
+
+    <!-- 统计任务集合的分配记录数（删除前校验） -->
+    <select id="countAssignByTaskIds" parameterType="Long" resultType="int">
+        select count(1) from te_task_assign where task_id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

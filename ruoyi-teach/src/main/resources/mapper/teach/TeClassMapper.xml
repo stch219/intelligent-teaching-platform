@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】班级管理 Mapper 映射文件（表 te_class，联查 sys_user/统计子查询）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeClassMapper">
+
+    <!-- 结果映射：班级字段 + 教师姓名 + 统计数 -->
+    <resultMap type="TeClass" id="TeClassResult">
+        <id     property="id"           column="id"            />
+        <result property="className"    column="class_name"    />
+        <result property="teacherId"    column="teacher_id"    />
+        <result property="groupCount"   column="group_count"   />
+        <result property="deadline"     column="deadline"      />
+        <result property="status"       column="status"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+        <result property="teacherName"  column="teacher_name"  />
+        <result property="studentCount" column="student_count" />
+        <result property="groupNum"     column="group_num"     />
+    </resultMap>
+
+    <!-- 通用查询：联查教师姓名，子查询统计学生数/小组数 -->
+    <sql id="selectTeClassVo">
+        select c.id, c.class_name, c.teacher_id, c.group_count, c.deadline, c.status,
+               c.create_by, c.create_time, c.update_time, c.remark, u.nick_name as teacher_name,
+               (select count(1) from te_student s where s.class_id = c.id) as student_count,
+               (select count(1) from te_group g where g.class_id = c.id)   as group_num
+        from te_class c
+        left join sys_user u on u.user_id = c.teacher_id
+    </sql>
+
+    <!-- 条件查询班级列表（教师ID精确过滤实现师生私有绑定；名称模糊） -->
+    <select id="selectTeClassList" parameterType="TeClass" resultMap="TeClassResult">
+        <include refid="selectTeClassVo"/>
+        <where>
+            <if test="teacherId != null">and c.teacher_id = #{teacherId}</if>
+            <if test="className != null and className != ''">and c.class_name like concat('%', #{className}, '%')</if>
+            <if test="status != null and status != ''">and c.status = #{status}</if>
+        </where>
+        order by c.id
+    </select>
+
+    <!-- 按ID查询班级 -->
+    <select id="selectTeClassById" parameterType="Long" resultMap="TeClassResult">
+        <include refid="selectTeClassVo"/>
+        where c.id = #{id}
+    </select>
+
+    <!-- 按班级名称查询（建班判重） -->
+    <select id="selectTeClassByName" parameterType="String" resultMap="TeClassResult">
+        <include refid="selectTeClassVo"/>
+        where c.class_name = #{className} limit 1
+    </select>
+
+    <!-- 新增班级 -->
+    <insert id="insertTeClass" parameterType="TeClass" useGeneratedKeys="true" keyProperty="id">
+        insert into te_class
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="className != null and className != ''">class_name,</if>
+            <if test="teacherId != null">teacher_id,</if>
+            <if test="groupCount != null">group_count,</if>
+            <if test="deadline != null">deadline,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="className != null and className != ''">#{className},</if>
+            <if test="teacherId != null">#{teacherId},</if>
+            <if test="groupCount != null">#{groupCount},</if>
+            <if test="deadline != null">#{deadline},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <!-- 修改班级 -->
+    <update id="updateTeClass" parameterType="TeClass">
+        update te_class
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="className != null and className != ''">class_name = #{className},</if>
+            <if test="teacherId != null">teacher_id = #{teacherId},</if>
+            <if test="groupCount != null">group_count = #{groupCount},</if>
+            <if test="deadline != null">deadline = #{deadline},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除班级 -->
+    <delete id="deleteTeClassByIds" parameterType="Long">
+        delete from te_class where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 统计班级学生数 -->
+    <select id="countStudentByClassId" parameterType="Long" resultType="int">
+        select count(1) from te_student where class_id = #{classId}
+    </select>
+
+    <!-- ============ 删除班级时的级联清理（此时小组尚未删除，可按班联查） ============ -->
+
+    <!-- 删除班级下全部模块内容（按小组归属联查） -->
+    <delete id="deleteContentByClassId" parameterType="Long">
+        delete from te_module_content where group_id in
+        (select id from te_group where class_id = #{classId})
+    </delete>
+
+    <!-- 删除班级下全部贡献率记录 -->
+    <delete id="deleteContributionByClassId" parameterType="Long">
+        delete from te_contribution where group_id in
+        (select id from te_group where class_id = #{classId})
+    </delete>
+
+    <!-- 删除班级下全部成员确认记录 -->
+    <delete id="deleteConfirmByClassId" parameterType="Long">
+        delete from te_confirm_record where group_id in
+        (select id from te_group where class_id = #{classId})
+    </delete>
+
+    <!-- 删除班级下全部成绩记录 -->
+    <delete id="deleteScoreByClassId" parameterType="Long">
+        delete from te_score where class_id = #{classId}
+    </delete>
+
+    <!-- 删除班级下全部预警记录 -->
+    <delete id="deleteWarningRecordByClassId" parameterType="Long">
+        delete from te_warning_record where class_id = #{classId}
+    </delete>
+
+</mapper>

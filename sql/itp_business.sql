@@ -47,6 +47,7 @@ CREATE TABLE te_class (
     id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '班级ID',
     class_name   VARCHAR(100) NOT NULL COMMENT '班级名称',
     teacher_id   BIGINT       NOT NULL COMMENT '指导教师用户ID（关联sys_user.user_id）',
+    group_count  TINYINT      DEFAULT 4 COMMENT '分组数（4/5/6，按学号末2位对组数取模自动分组）',
     deadline     DATETIME     DEFAULT NULL COMMENT '课程设计任务截止提交时间',
     status       CHAR(1)      DEFAULT '0' COMMENT '状态（0正常 1停用）',
     create_by    VARCHAR(64)  DEFAULT '' COMMENT '创建者',
@@ -58,12 +59,12 @@ CREATE TABLE te_class (
 ) ENGINE=InnoDB COMMENT='班级表';
 
 -- ----------------------------------------------------------------------------
--- 4. 小组表（组名统一"第N组"，展示使用专属色条底纹）
+-- 4. 小组表（组名字母命名：A组/B组/…，展示使用专属色条底纹）
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS te_group;
 CREATE TABLE te_group (
     id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '小组ID',
-    group_name    VARCHAR(50)  NOT NULL COMMENT '小组名称（第一组/第二组/…）',
+    group_name    VARCHAR(50)  NOT NULL COMMENT '小组名称（A组/B组/…按字母命名）',
     group_order   INT          NOT NULL DEFAULT 1 COMMENT '组序号（用于排序与自动分组规则）',
     class_id      BIGINT       NOT NULL COMMENT '所属班级ID',
     color_code    VARCHAR(20)  DEFAULT '#409EFF' COMMENT '专属色条底纹颜色值',
