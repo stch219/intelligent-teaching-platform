@@ -6,6 +6,15 @@
 // ============================================================================
 import request from '@/utils/request'
 
+// 学生匿名提交注册申请（无需登录，登录页注册页签调用）
+export function submitRegistration(data) {
+  return request({
+    url: '/teach/register',
+    method: 'post',
+    data: data
+  })
+}
+
 // 查询注册申请列表（支持姓名/学号/班级/状态筛选）
 export function listRegistration(query) {
   return request({

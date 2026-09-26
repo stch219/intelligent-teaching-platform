@@ -35,9 +35,6 @@ public class TeStudentServiceImpl implements ITeStudentService
     /** 学生角色 role_key（sys_role 中预置） */
     private static final String STUDENT_ROLE_KEY = "student";
 
-    /** 学生初始密码 */
-    private static final String INIT_PASSWORD = "123456";
-
     @Autowired
     private TeStudentMapper studentMapper;
 
@@ -82,12 +79,12 @@ public class TeStudentServiceImpl implements ITeStudentService
         {
             throw new ServiceException("学号 " + student.getStudentNo() + " 已存在");
         }
-        // 创建系统账号（初始密码 123456，授予学生角色）
+        // 创建系统账号（初始密码为学号后6位，授予学生角色）
         SysUser user = new SysUser();
         user.setUserName(student.getStudentNo());
         user.setNickName(student.getNickName());
         user.setPhonenumber(student.getPhonenumber());
-        user.setPassword(SecurityUtils.encryptPassword(INIT_PASSWORD));
+        user.setPassword(SecurityUtils.encryptPassword(initPassword(student.getStudentNo())));
         user.setStatus("0");
         user.setRoleIds(new Long[]{ getStudentRoleId() });
         user.setCreateBy(operateBy);
@@ -216,12 +213,12 @@ public class TeStudentServiceImpl implements ITeStudentService
                 TeStudent exist = studentMapper.selectTeStudentByNo(row.getStudentNo());
                 if (exist == null)
                 {
-                    // 新建：账号 + 扩展记录
+                    // 新建：账号 + 扩展记录（初始密码为学号后6位）
                     SysUser user = new SysUser();
                     user.setUserName(row.getStudentNo());
                     user.setNickName(row.getNickName());
                     user.setPhonenumber(row.getPhonenumber());
-                    user.setPassword(SecurityUtils.encryptPassword(INIT_PASSWORD));
+                    user.setPassword(SecurityUtils.encryptPassword(initPassword(row.getStudentNo())));
                     user.setStatus("0");
                     user.setRoleIds(new Long[]{ getStudentRoleId() });
                     user.setCreateBy(operateBy);
@@ -297,5 +294,16 @@ public class TeStudentServiceImpl implements ITeStudentService
             }
         }
         throw new ServiceException("系统未初始化「学生」角色，请先执行 sql/itp_menu.sql");
+    }
+
+    /**
+     * 生成学生初始密码：学号后6位（学号不足6位时取全学号）
+     *
+     * @param studentNo 学号
+     * @return 初始密码（明文）
+     */
+    private String initPassword(String studentNo)
+    {
+        return studentNo.length() > 6 ? studentNo.substring(studentNo.length() - 6) : studentNo;
     }
 }

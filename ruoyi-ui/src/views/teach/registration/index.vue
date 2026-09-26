@@ -162,7 +162,7 @@ function handleSelectionChange(selection) {
 
 /** 审批通过（二次确认后调用后端自动建号） */
 function handleApprove(row) {
-  proxy.$modal.confirm(`确认通过「${row.realName}（${row.studentNo}）」的注册申请？通过后将自动创建学生账号（初始密码 123456）`).then(() => {
+  proxy.$modal.confirm(`确认通过「${row.realName}（${row.studentNo}）」的注册申请？通过后将自动创建学生账号（初始密码为学号后6位）`).then(() => {
     return approveRegistration(row.id)
   }).then(() => {
     getList()

@@ -35,9 +35,6 @@ public class TeRegistrationServiceImpl implements ITeRegistrationService
     /** 学生角色 role_key（sys_role 中预置） */
     private static final String STUDENT_ROLE_KEY = "student";
 
-    /** 学生注册账号的初始密码 */
-    private static final String INIT_PASSWORD = "123456";
-
     @Autowired
     private TeRegistrationMapper registrationMapper;
 
@@ -124,12 +121,12 @@ public class TeRegistrationServiceImpl implements ITeRegistrationService
             throw new ServiceException("学号 " + reg.getStudentNo() + " 已存在学生账号，请驳回该申请");
         }
 
-        // 4. 创建登录账号：学号即账号，初始密码 123456，授予学生角色
+        // 4. 创建登录账号：学号即账号，初始密码为学号后6位，授予学生角色
         SysUser user = new SysUser();
         user.setUserName(reg.getStudentNo());
         user.setNickName(reg.getRealName());
         user.setPhonenumber(reg.getPhone());
-        user.setPassword(SecurityUtils.encryptPassword(INIT_PASSWORD));
+        user.setPassword(SecurityUtils.encryptPassword(initPassword(reg.getStudentNo())));
         user.setStatus("0");
         user.setRoleIds(new Long[]{ getStudentRoleId() });
         user.setCreateBy(operateBy);
@@ -197,5 +194,16 @@ public class TeRegistrationServiceImpl implements ITeRegistrationService
             }
         }
         throw new ServiceException("系统未初始化「学生」角色，请先执行 sql/itp_menu.sql");
+    }
+
+    /**
+     * 生成学生初始密码：学号后6位（学号不足6位时取全学号）
+     *
+     * @param studentNo 学号
+     * @return 初始密码（明文）
+     */
+    private String initPassword(String studentNo)
+    {
+        return studentNo.length() > 6 ? studentNo.substring(studentNo.length() - 6) : studentNo;
     }
 }

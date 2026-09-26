@@ -283,7 +283,7 @@ function handleSelectionChange(selection) {
 function handleAdd() {
   reset()
   open.value = true
-  title.value = "新增学生（初始密码 123456）"
+  title.value = "新增学生（初始密码为学号后6位）"
 }
 
 /** 修改按钮 */
