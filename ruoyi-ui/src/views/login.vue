@@ -63,8 +63,8 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 注册页签（学生注册审批制） -->
-        <el-tab-pane label="注册" name="register">
+        <!-- 注册页签（仅学生端显示：注册为审批制，教师/管理员由系统统一分配账号，无注册入口） -->
+        <el-tab-pane v-if="role === 'student'" label="注册" name="register">
           <el-form ref="regRef" :model="regForm" :rules="regRules">
             <el-form-item prop="realName">
               <el-input v-model="regForm.realName" size="large" placeholder="请输入真实姓名">
@@ -129,6 +129,12 @@ const role = ref("student")
 const currentRole = computed(() => roleList.find(r => r.key === role.value))
 
 const activeTab = ref("login")
+// 仅学生端保留注册页签：切换到教师/管理员角色时自动回到登录页签
+watch(role, (val) => {
+  if (val !== "student") {
+    activeTab.value = "login"
+  }
+})
 const codeUrl = ref("")
 const loading = ref(false)
 const regLoading = ref(false)
