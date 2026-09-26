@@ -77,19 +77,21 @@ export const constantRoutes = [
     meta: { title: '锁定屏幕' }
   },
   {
-    // 教师端独立门户（不走若依后台 Layout，顶栏式布局，静态路由无需后端菜单）
+    // 教师端门户：与管理员端共用统一侧边栏布局（Layout），
+    // meta.roles 控制侧边栏菜单仅教师可见（admin 超管全可见），
+    // 页面级接口鉴权由后端 @ss.hasRole('teacher') 保护
     path: '/teacher',
-    component: () => import('@/views/portal/teacher/layout'),
-    hidden: true,
+    component: Layout,
     redirect: '/teacher/index',
+    meta: { title: '课程设计管理', icon: 'education', roles: ['teacher'] },
     children: [
-      { path: 'index', component: () => import('@/views/portal/teacher/index'), name: 'TeacherHome', meta: { title: '教师工作台' } },
-      { path: 'class', component: () => import('@/views/portal/teacher/class/index'), name: 'TeacherClass', meta: { title: '班级与分组' } },
-      { path: 'task', component: () => import('@/views/portal/teacher/task/index'), name: 'TeacherTask', meta: { title: '任务管理' } },
-      { path: 'module', component: () => import('@/views/portal/teacher/module/index'), name: 'TeacherModule', meta: { title: '模块设置' } },
-      { path: 'material', component: () => import('@/views/portal/teacher/material/index'), name: 'TeacherMaterial', meta: { title: '资料发布' } },
-      { path: 'warning', component: () => import('@/views/portal/teacher/warning/index'), name: 'TeacherWarning', meta: { title: '预警规则' } },
-      { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分' } }
+      { path: 'index', component: () => import('@/views/portal/teacher/index'), name: 'TeacherHome', meta: { title: '教师工作台', icon: 'dashboard' } },
+      { path: 'class', component: () => import('@/views/portal/teacher/class/index'), name: 'TeacherClass', meta: { title: '班级与分组', icon: 'peoples' } },
+      { path: 'task', component: () => import('@/views/portal/teacher/task/index'), name: 'TeacherTask', meta: { title: '任务管理', icon: 'list' } },
+      { path: 'module', component: () => import('@/views/portal/teacher/module/index'), name: 'TeacherModule', meta: { title: '模块设置', icon: 'form' } },
+      { path: 'material', component: () => import('@/views/portal/teacher/material/index'), name: 'TeacherMaterial', meta: { title: '资料发布', icon: 'documentation' } },
+      { path: 'warning', component: () => import('@/views/portal/teacher/warning/index'), name: 'TeacherWarning', meta: { title: '预警规则', icon: 'bell' } },
+      { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分', icon: 'money' } }
     ]
   },
   {

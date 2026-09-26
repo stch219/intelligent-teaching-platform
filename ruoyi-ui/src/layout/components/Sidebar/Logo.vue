@@ -2,11 +2,16 @@
   <div class="sidebar-logo-container" :class="{ 'collapse': collapse }">
     <transition name="sidebarLogoFade">
       <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 v-else class="sidebar-title">{{ title }}</h1>
+        <!-- 品牌图标：学士帽（平台 Logo，折叠态仅显示图标） -->
+        <svg class="sidebar-logo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M22 9L24 10.5V16H22V9ZM2 9L12 3L22 9V10.5L12 16.5L2 10.5V9ZM6 13.5V16.5C6 17.6046 8.68629 19.5 12 19.5C15.3137 19.5 18 17.6046 18 16.5V13.5L12 17.25L6 13.5Z"/>
+        </svg>
       </router-link>
       <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
+        <!-- 品牌图标 + 平台名称 -->
+        <svg class="sidebar-logo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M22 9L24 10.5V16H22V9ZM2 9L12 3L22 9V10.5L12 16.5L2 10.5V9ZM6 13.5V16.5C6 17.6046 8.68629 19.5 12 19.5C15.3137 19.5 18 17.6046 18 16.5V13.5L12 17.25L6 13.5Z"/>
+        </svg>
         <h1 class="sidebar-title">{{ title }}</h1>
       </router-link>
     </transition>
@@ -14,7 +19,6 @@
 </template>
 
 <script setup>
-import logo from '@/assets/logo/logo.png'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
 
@@ -25,6 +29,7 @@ defineProps({
   }
 })
 
+// 平台名称取自环境变量（.env 中 VITE_APP_TITLE）
 const title = import.meta.env.VITE_APP_TITLE
 const settingsStore = useSettingsStore()
 const sideTheme = computed(() => settingsStore.sideTheme)

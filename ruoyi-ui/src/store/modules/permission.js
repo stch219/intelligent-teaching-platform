@@ -1,6 +1,7 @@
 import auth from '@/plugins/auth'
 import router, { constantRoutes, dynamicRoutes } from '@/router'
 import { getRouters } from '@/api/menu'
+import useUserStore from '@/store/modules/user'
 import Layout from '@/layout/index'
 import ParentView from '@/components/ParentView'
 import InnerLink from '@/layout/components/InnerLink'
@@ -45,7 +46,15 @@ const usePermissionStore = defineStore(
             const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
             asyncRoutes.forEach(route => { router.addRoute(route) })
             this.setRoutes(rewriteRoutes)
-            this.setSidebarRouters(constantRoutes.concat(sidebarRoutes))
+            // 门户静态路由按角色过滤后再进侧边栏：
+            // 带 meta.roles 的路由仅当用户角色命中时显示（admin 超管全可见）
+            const myRoles = (roles && roles.length) ? roles : useUserStore().roles
+            const visibleConst = constantRoutes.filter(rt => {
+              if (!rt.meta || !rt.meta.roles) return true
+              if (myRoles.includes('admin')) return true
+              return rt.meta.roles.some(r => myRoles.includes(r))
+            })
+            this.setSidebarRouters(visibleConst.concat(sidebarRoutes))
             this.setDefaultRoutes(sidebarRoutes)
             this.setTopbarRoutes(defaultRoutes)
             resolve(rewriteRoutes)
