@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】模块贡献率 Mapper 映射文件（表 te_contribution）
+     【说明】组长整体重分配 = 先删后插（同时重置组员确认状态）；
+             组员确认按 组+人 维度一次性确认全部模块行
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeContributionMapper">
+
+    <!-- 结果映射：联查字段 → TeContribution 实体 -->
+    <resultMap type="com.ruoyi.teach.domain.TeContribution" id="TeContributionResult">
+        <id     property="id"          column="id"           />
+        <result property="groupId"     column="group_id"     />
+        <result property="moduleCode"  column="module_code"  />
+        <result property="userId"      column="user_id"      />
+        <result property="ratio"       column="ratio"        />
+        <result property="confirmed"   column="confirmed"    />
+        <result property="confirmTime" column="confirm_time" />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+        <result property="nickName"    column="nick_name"    />
+        <result property="studentNo"   column="student_no"   />
+    </resultMap>
+
+    <!-- 本组全部贡献率行（联查组员姓名/学号） -->
+    <select id="selectByGroup" parameterType="Long" resultMap="TeContributionResult">
+        select ct.id, ct.group_id, ct.module_code, ct.user_id, ct.ratio,
+               ct.confirmed, ct.confirm_time, ct.create_time, ct.update_time,
+               u.nick_name, s.student_no
+        from te_contribution ct
+        left join sys_user u on u.user_id = ct.user_id
+        left join te_student s on s.user_id = ct.user_id
+        where ct.group_id = #{groupId}
+        order by ct.module_code, s.student_no
+    </select>
+
+    <!-- 删除本组某模块全部分配行（组长重分配前清空） -->
+    <delete id="deleteByGroupModule">
+        delete from te_contribution
+        where group_id = #{groupId} and module_code = #{moduleCode}
+    </delete>
+
+    <!-- 批量插入分配行（confirmed 置0，需组员重新确认） -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        insert into te_contribution
+            (group_id, module_code, user_id, ratio, confirmed, create_time, update_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.groupId}, #{item.moduleCode}, #{item.userId}, #{item.ratio},
+             0, sysdate(), sysdate())
+        </foreach>
+    </insert>
+
+    <!-- 组员确认：本组本人全部行置已确认并记录时间 -->
+    <update id="confirmByGroupUser">
+        update te_contribution
+        set confirmed = 1, confirm_time = sysdate(), update_time = sysdate()
+        where group_id = #{groupId} and user_id = #{userId}
+    </update>
+
+</mapper>

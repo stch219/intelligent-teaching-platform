@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】模块内容 Mapper 映射文件（表 te_module_content）
+     【说明】模块看板三表联查（te_module_set × te_module_content ×
+             te_module_score_set）；乐观锁更新带 version 条件，
+             提交（status=2）时同步写入提交时间
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeModuleContentMapper">
+
+    <!-- 模块看板联查：设置为主体，内容/赋分为左连接（未编辑/未赋分也有行） -->
+    <select id="selectModuleBoard" resultType="java.util.HashMap">
+        select ms.module_code      as moduleCode,
+               ms.module_name      as moduleName,
+               ms.count_type       as countType,
+               ms.min_count        as minCount,
+               ms.max_count        as maxCount,
+               ms.need_formula     as needFormula,
+               ms.need_image       as needImage,
+               ms.need_code        as needCode,
+               ms.editable         as editable,
+               mc.id               as contentId,
+               mc.status           as status,
+               mc.progress         as progress,
+               mc.word_count       as wordCount,
+               mc.item_count       as itemCount,
+               mc.version          as version,
+               mc.update_time      as updateTime,
+               sc.score            as score
+        from te_module_set ms
+        left join te_module_content mc
+               on mc.group_id = #{groupId} and mc.module_code = ms.module_code
+        left join te_module_score_set sc
+               on sc.class_id = #{classId} and sc.module_code = ms.module_code
+        where ms.class_id = #{classId}
+        order by ms.module_code
+    </select>
+
+    <!-- 定位本组某模块内容（乐观锁编辑入口） -->
+    <select id="selectByGroupModule" parameterType="java.util.HashMap" resultType="com.ruoyi.teach.domain.TeModuleContent">
+        select id, group_id, module_code, content, status, progress, version,
+               word_count, item_count, submit_time, create_by, create_time,
+               update_by, update_time
+        from te_module_content
+        where group_id = #{groupId} and module_code = #{moduleCode}
+    </select>
+
+    <!-- 新增模块内容记录（首次编辑初始化，版本号从0开始） -->
+    <insert id="insertTeModuleContent" parameterType="com.ruoyi.teach.domain.TeModuleContent"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into te_module_content
+            (group_id, module_code, content, status, progress, version,
+             word_count, item_count, create_by, create_time, update_by, update_time)
+        values
+            (#{groupId}, #{moduleCode}, #{content}, #{status}, #{progress}, 0,
+             #{wordCount}, #{itemCount}, #{createBy}, sysdate(), #{updateBy}, sysdate())
+    </insert>
+
+    <!-- 乐观锁更新：version 不匹配返回0行；提交时（status=2）写入提交时间 -->
+    <update id="updateWithVersion" parameterType="com.ruoyi.teach.domain.TeModuleContent">
+        update te_module_content
+        set content     = #{content},
+            status      = #{status},
+            progress    = #{progress},
+            word_count  = #{wordCount},
+            item_count  = #{itemCount},
+            update_by   = #{updateBy},
+            update_time = sysdate(),
+            submit_time = <choose>
+                            <when test="status != null and status == 2">sysdate()</when>
+                            <otherwise>submit_time</otherwise>
+                          </choose>,
+            version     = version + 1
+        where id = #{id} and version = #{version}
+    </update>
+
+</mapper>

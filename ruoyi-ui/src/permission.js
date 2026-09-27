@@ -51,11 +51,15 @@ router.beforeEach(async (to, from) => {
             router.addRoute(route)
           }
         })
-        // 按角色门户分流：教师进入独立教师门户（不进入若依后台首页）
+        // 按角色门户分流：教师进入教师门户，学生进入学生门户（不进入若依后台首页）
         const roles = useUserStore().roles
         if (roles.includes('teacher') && (to.path === '/' || to.path === '/index')) {
           NProgress.done()
           return { path: '/teacher/index', replace: true }
+        }
+        if (roles.includes('student') && (to.path === '/' || to.path === '/index')) {
+          NProgress.done()
+          return { path: '/student/index', replace: true }
         }
         // 重新导航到目标路由，确保动态路由已注册
         return { ...to, replace: true }

@@ -63,6 +63,14 @@ public interface TeStudentMapper
     public Long selectGroupIdByOrder(Map<String, Object> param);
 
     /**
+     * 查询班级指导教师姓名（学生端公示板/我的信息展示）
+     *
+     * @param classId 班级ID
+     * @return 教师姓名（不存在返回 null）
+     */
+    public String selectTeacherNameByClassId(Long classId);
+
+    /**
      * 新增学生扩展记录（sys_user 由系统用户服务创建）
      *
      * @param student 学生扩展信息

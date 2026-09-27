@@ -95,6 +95,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id from te_group where class_id = #{classId} and group_order = #{groupOrder} limit 1
     </select>
 
+    <!-- 按班级ID查指导教师姓名（学生端展示） -->
+    <select id="selectTeacherNameByClassId" parameterType="Long" resultType="String">
+        select u.nick_name
+        from te_class c
+        left join sys_user u on u.user_id = c.teacher_id
+        where c.id = #{classId}
+    </select>
+
     <!-- 新增学生扩展记录 -->
     <insert id="insertTeStudent" parameterType="TeStudent">
         insert into te_student

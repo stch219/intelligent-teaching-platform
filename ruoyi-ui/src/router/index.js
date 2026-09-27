@@ -95,6 +95,22 @@ export const constantRoutes = [
     ]
   },
   {
+    // 学生端门户：与管理员/教师端共用统一侧边栏布局（Layout），
+    // meta.roles 控制侧边栏菜单仅学生可见（admin 超管全可见），
+    // 页面级接口鉴权由后端 @ss.hasRole('student') 保护
+    path: '/student',
+    component: Layout,
+    redirect: '/student/index',
+    meta: { title: '课程设计中心', icon: 'peoples', roles: ['student'] },
+    children: [
+      { path: 'index', component: () => import('@/views/portal/student/index'), name: 'StudentHome', meta: { title: '学生工作台', icon: 'dashboard' } },
+      { path: 'profile', component: () => import('@/views/portal/student/profile/index'), name: 'StudentProfile', meta: { title: '个人中心', icon: 'user' } },
+      { path: 'board', component: () => import('@/views/portal/student/board/index'), name: 'StudentBoard', meta: { title: '公示板', icon: 'clipboard' } },
+      { path: 'modules', component: () => import('@/views/portal/student/modules/index'), name: 'StudentModules', meta: { title: '模块编辑', icon: 'form' } },
+      { path: 'contribution', component: () => import('@/views/portal/student/contribution/index'), name: 'StudentContribution', meta: { title: '贡献率', icon: 'chart' } }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     hidden: true,
