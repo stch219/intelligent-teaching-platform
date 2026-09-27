@@ -1,17 +1,21 @@
 # ============================================================================
 # 【功能】AI 批改推理服务依赖清单（阶段7）
 # ----------------------------------------------------------------------------
-# 【安装】pip install -r requirements.txt
+# 【安装】pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 【GPU 说明】默认安装的是 CPU 版 torch；有 NVIDIA 显卡建议先按主 README
 #             的命令安装 CUDA 版 torch，再执行本清单（已装则自动跳过）。
-# 【首次运行】ai_server.py 会自动从 HF 镜像下载 Qwen2.5-VL-3B 模型权重（约7GB，仅一次）
+# 【首次运行】推荐先用魔搭下载模型到本地（国内直连免代理，见主 README）：
+#             modelscope download --model Qwen/Qwen2.5-VL-3B-Instruct --local_dir models/qwen2.5-vl-3b
+#             不下载则 ai_server.py 启动时自动走 HF 镜像下载（境外源，网络不佳易超时）
 # ============================================================================
 
 torch>=2.2            # 深度学习框架（推理核心）
+torchvision           # 视觉处理（Qwen2VLVideoProcessor 必需，缺失则 processor 加载失败）
 transformers>=4.49    # 模型加载与推理（含 Qwen2.5-VL 支持）
 accelerate>=0.30      # transformers 设备映射加速
 pillow>=10.0          # 图片解码（富文本内嵌 base64 图片）
 qwen-vl-utils>=0.0.8  # Qwen 视觉模型工具链
+modelscope            # 魔搭模型下载工具（国内直连，仅下载模型用，推理不依赖）
 
 # 可选：小显存 4bit 量化支持（仅 NVIDIA GPU 有意义；装不上不影响运行，
 #       缺失时自动跳过第2级降级，直接落 CPU 推理）

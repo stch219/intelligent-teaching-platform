@@ -122,7 +122,9 @@ npm run dev
 # 5.（可选）启动 AI 批改引擎（不开也能用：Java 端自动降级本地规则批改）
 cd ai_engine
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-python ai_server.py    # 端口 8300；首次运行自动从 hf-mirror 下载 Qwen2.5-VL-3B（约 7GB）
+# 首次使用：用魔搭（国内直连免代理）预先下载模型权重到本地目录（约7GB，仅一次）
+modelscope download --model Qwen/Qwen2.5-VL-3B-Instruct --local_dir models/qwen2.5-vl-3b
+python ai_server.py    # 端口 8300；检测到本地模型目录即离线加载，无需联网
 ```
 
 > **AI 引擎硬件自适应降级链**（`ai_engine/ai_server.py` 自动探测，无需配置）：
@@ -130,6 +132,28 @@ python ai_server.py    # 端口 8300；首次运行自动从 hf-mirror 下载 Qw
 > ② 有 GPU 但显存不足 → 4bit 量化加载（需 `pip install bitsandbytes`）
 > ③ 无 GPU → CPU 推理（慢，约 2~5 分钟/模块，任何机器可跑）
 > ④ Python 服务完全不可用 → Java 端本地规则批改兜底（零依赖，按字数/结构/代码块估算分数并生成评语），保证批改流程永不中断。
+>
+> **⚠️ NVIDIA 显卡用户必读**：`pip install torch` 默认装的是 **CPU 版**（`+cpu` 后缀），
+> 装了它即使有显卡也只会走 CPU 推理。有显卡请先换装 CUDA 版（Blackwell 新卡如 5070 Ti 用 cu128，老卡用 cu121）。
+> **注意必须锁定版本号**：官方 cu128 源最高只有 `torch 2.11.0+cu128`，不带版本号时 pip 会解析到更新的 2.14 版、
+> 在 CUDA 源上找不到而绕回清华源的 CPU 版（实测踩坑）：
+>
+> ```bash
+> # 5070 Ti / 5080 / 5090 等新一代显卡（CUDA 12.8，走阿里镜像国内直连，无需代理）
+> pip install torch==2.11.0+cu128 torchvision==0.26.0+cu128 -f https://mirrors.aliyun.com/pytorch-wheels/cu128/ -i https://pypi.tuna.tsinghua.edu.cn/simple
+> # GTX/RTX 20~40 系显卡（CUDA 12.1，同样锁定版本号）
+> pip install torch==2.4.1+cu121 torchvision==0.19.1+cu121 -f https://mirrors.aliyun.com/pytorch-wheels/cu121/ -i https://pypi.tuna.tsinghua.edu.cn/simple
+> # 验证：版本带 +cu128 且输出 True 才会用 GPU
+> python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+> ```
+>
+> 若 pip 下载中途断连挂起（大文件易发生），可用 BITS 断点续传手动下载 wheel 后本地安装：
+>
+> ```powershell
+> # BITS 支持断点续传，中断后重跑同一命令会自动续传
+> Start-BitsTransfer -Source 'https://mirrors.aliyun.com/pytorch-wheels/cu128/torch-2.11.0%2Bcu128-cp313-cp313-win_amd64.whl' -Destination '.\torch-2.11.0+cu128-cp313-cp313-win_amd64.whl'
+> pip install --force-reinstall '.\torch-2.11.0+cu128-cp313-cp313-win_amd64.whl' -i https://pypi.tuna.tsinghua.edu.cn/simple
+> ```
 
 访问 http://localhost:80（前端开发端口见 vite 配置），默认管理员账号 `admin / admin123`。
 
@@ -142,7 +166,7 @@ python ai_server.py    # 端口 8300；首次运行自动从 hf-mirror 下载 Qw
 - [x] 阶段4：学生端（独立门户 /student：工作台 / 个人中心角色分工 / 公示板 / 10大模块协同编辑（字数条目校验+乐观锁防覆盖） / 贡献率分配与确认 / 组长分工确认）
 - [x] 阶段5：系统引擎（封面自动生成（模块1系统合成只读展示） / 总稿合规预检4项（组长身份·模块全提交·分工全确认·贡献率分配并全员确认） / 一键提交总稿（封面落库锁定·小组置已提交·组长分工自动确认） / 总稿PDF导出（封面页+目录页+10模块正文·中文字体嵌入·页脚页码））
 - [x] 阶段6：消息系统（WebSocket 实时单聊/组内群聊（token 握手认证·心跳保活·断线重连·同账号顶替） / 已读未读回执（进入会话即读·导航未读角标） / 可联系人发起单聊（学生=指导教师+组员·教师=本班学生） / 模块讨论话题（学生发起本组话题·教师查看本班并回复·楼中楼指向） / 班级公告（教师发布·归属校验·在线学生 WebSocket 实时提醒） / 师生共用消息中心/讨论/公告三大页面）
-- [x] 阶段7：AI 批改 + 成绩判分（本地多模态大模型批改（transformers + Qwen2.5-VL-3B·GPU/CPU 硬件自适应降级·引擎不可用规则兜底） / 三段式评语（亮点-问题-建议） / 教师核查核定终分 / 成绩判分汇总（模块得分=满分×生效分%·个人得分=模块得分×贡献率%） / 一键发布（重复发布自动撤回旧成绩） / 教师端 AI 批改工作台 / 学生端「我的成绩」分数卡+模块明细）
+- [x] 阶段7：AI 批改 + 成绩判分（本地多模态大模型批改（transformers + Qwen2.5-VL-3B·GPU/CPU 硬件自适应降级·引擎不可用规则兜底） / 三段式评语（亮点-问题-建议） / 教师核查核定终分 / 成绩判分汇总（模块得分=满分×生效分%·个人得分=模块得分×贡献率%） / 一键发布（重复发布自动撤回旧成绩） / 教师端 AI 批改工作台 / 学生端「我的成绩」分数卡+模块明细）——实测 RTX 5070 Ti 12GB 命中降级链第①级 bf16：4.3 秒/模块（CPU 约 2~5 分钟），6 模块 26 秒完成批改+落库+成绩折算全链路
 - [ ] 阶段8：仪表盘、三级预警、帮助中心
 - [ ] 阶段9：测试、文档终稿、发布
 

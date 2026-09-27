@@ -28,6 +28,9 @@ import os
 
 # 国内网络环境优先使用 HF 镜像站加速模型下载（必须在 import transformers 之前设置）
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+# 禁用 Xet 下载协议：部分新仓库的文件会被重定向到境外 xethub.hf.co 导致国内直连超时，
+# 关闭后强制走镜像站的普通 HTTP 下载（必须在 import huggingface_hub 之前设置）
+os.environ.setdefault("HF_HUB_ENABLE_XET", "0")
 
 import json
 import re
@@ -82,6 +85,9 @@ def _detect_free_vram_gb():
 def load_engine():
     """
     【功能】按硬件降级链加载模型（后台调用一次，全局只加载一份）
+    【模型来源优先级】
+      1. 本地目录 models/qwen2.5-vl-3b（用魔搭 ModelScope 预先下载，国内直连免代理）
+      2. HF 线上仓库（HF_ENDPOINT 已指向 hf-mirror，网络通畅时自动下载缓存）
     """
     global MODEL, PROCESSOR, ENGINE_NAME, MODEL_LABEL
     try:
@@ -89,6 +95,18 @@ def load_engine():
         from transformers import AutoProcessor
         # Qwen2.5-VL 的专用模型类（旧版 transformers 无此类时捕获后降级）
         from transformers import Qwen2_5_VLForConditionalGeneration
+
+        # ---------- 模型来源探测：本地目录完整（关键文件齐全）则离线加载 ----------
+        local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "models", "qwen2.5-vl-3b")
+        key_files = ["config.json", "model.safetensors.index.json",
+                     "model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"]
+        if all(os.path.isfile(os.path.join(local_dir, f)) for f in key_files):
+            model_source = local_dir
+            print(f"[AI] 检测到本地模型目录，离线加载：{local_dir}")
+        else:
+            model_source = MODEL_ID
+            print(f"[AI] 本地模型目录不完整，改走 HF 线上加载：{MODEL_ID}")
 
         has_cuda = torch.cuda.is_available()
         free_gb = _detect_free_vram_gb()
@@ -98,7 +116,7 @@ def load_engine():
         if has_cuda and free_gb >= GPU_VRAM_MIN_GB:
             print("[AI] 降级链第1级：GPU bfloat16 全精度推理")
             MODEL = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                MODEL_ID, torch_dtype=torch.bfloat16, device_map={"": 0})
+                model_source, torch_dtype=torch.bfloat16, device_map={"": 0})
             ENGINE_NAME, MODEL_LABEL = "gpu", "Qwen2.5-VL-3B-Instruct(bf16)"
 
         # ---------- 第2级：GPU 4bit 量化 ----------
@@ -108,7 +126,7 @@ def load_engine():
             bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                      bnb_4bit_compute_dtype=torch.bfloat16)
             MODEL = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                MODEL_ID, quantization_config=bnb, device_map={"": 0})
+                model_source, quantization_config=bnb, device_map={"": 0})
             ENGINE_NAME, MODEL_LABEL = "gpu-4bit", "Qwen2.5-VL-3B-Instruct(4bit)"
 
         # ---------- 第3级：CPU 推理 ----------
@@ -116,10 +134,10 @@ def load_engine():
             print("[AI] 降级链第3级：CPU 推理（速度较慢，属正常现象）")
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float32
             MODEL = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                MODEL_ID, torch_dtype=dtype, device_map="cpu")
+                model_source, torch_dtype=dtype, device_map="cpu")
             ENGINE_NAME, MODEL_LABEL = "cpu", "Qwen2.5-VL-3B-Instruct(CPU)"
 
-        PROCESSOR = AutoProcessor.from_pretrained(MODEL_ID)
+        PROCESSOR = AutoProcessor.from_pretrained(model_source)
         MODEL.eval()
         print(f"[AI] 模型加载完成：engine={ENGINE_NAME}, model={MODEL_LABEL}")
     except Exception as e:

@@ -57,6 +57,11 @@ upload/
 ######################################################################
 # AI 服务（Python）
 __pycache__/
+# AI 引擎本地模型目录（魔搭/HF 下载的 7GB 权重文件，体积巨大不入库，
+# 用 ai_engine/README 或主 README 中的命令自行下载）
+ai_engine/models/
+# AI 引擎本地 wheel 缓存（CUDA 版 torch 约 2.5GB，手动下载的安装包不入库）
+ai_engine/wheels/
 *.py[cod]
 .venv/
 venv/
