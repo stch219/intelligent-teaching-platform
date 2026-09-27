@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】成绩 Mapper 映射文件（表 te_score，唯一键 user_id）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeScoreMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeScore" id="TeScoreResult">
+        <id     property="id"          column="id"           />
+        <result property="classId"     column="class_id"     />
+        <result property="groupId"     column="group_id"     />
+        <result property="userId"      column="user_id"      />
+        <result property="groupScore"  column="group_score"  />
+        <result property="finalScore"  column="final_score"  />
+        <result property="isPublished" column="is_published" />
+        <result property="publishTime" column="publish_time" />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+        <!-- 联查展示列（全局驼峰转换未开启，需显式映射） -->
+        <result property="nickName"    column="nick_name"    />
+        <result property="studentNo"   column="student_no"   />
+        <result property="groupName"   column="group_name"   />
+    </resultMap>
+
+    <!-- 保存/更新成绩（唯一键 user_id 冲突时覆盖更新；重新汇算即撤回发布，需教师重新发布） -->
+    <insert id="upsert" parameterType="TeScore">
+        insert into te_score
+            (class_id, group_id, user_id, group_score, final_score,
+             is_published, publish_time, create_time, update_time)
+        values
+            (#{classId}, #{groupId}, #{userId}, #{groupScore}, #{finalScore},
+             0, null, #{createTime}, #{updateTime})
+        on duplicate key update
+            class_id     = #{classId},
+            group_id     = #{groupId},
+            group_score  = #{groupScore},
+            final_score  = #{finalScore},
+            is_published = 0,
+            publish_time = null,
+            update_time  = #{updateTime}
+    </insert>
+
+    <!-- 查询本组全部学生成绩（联查姓名/学号，按学号排序） -->
+    <select id="selectByGroup" parameterType="Long" resultMap="TeScoreResult">
+        select s.id, s.class_id, s.group_id, s.user_id, s.group_score, s.final_score,
+               s.is_published, s.publish_time, s.create_time, s.update_time,
+               u.nick_name, st.student_no, g.group_name
+        from te_score s
+        left join sys_user u on u.user_id = s.user_id
+        left join te_student st on st.user_id = s.user_id
+        left join te_group g on g.id = s.group_id
+        where s.group_id = #{groupId}
+        order by st.student_no
+    </select>
+
+    <!-- 按用户查询成绩（学生端"我的成绩"） -->
+    <select id="selectByUserId" parameterType="Long" resultMap="TeScoreResult">
+        select id, class_id, group_id, user_id, group_score, final_score,
+               is_published, publish_time, create_time, update_time
+        from te_score
+        where user_id = #{userId}
+        limit 1
+    </select>
+
+    <!-- 发布本组全部成绩 -->
+    <update id="publishByGroup" parameterType="Long">
+        update te_score
+        set is_published = 1, publish_time = now(), update_time = now()
+        where group_id = #{groupId}
+    </update>
+
+</mapper>

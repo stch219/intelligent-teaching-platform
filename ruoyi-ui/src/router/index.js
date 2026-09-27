@@ -92,6 +92,8 @@ export const constantRoutes = [
       { path: 'material', component: () => import('@/views/portal/teacher/material/index'), name: 'TeacherMaterial', meta: { title: '资料发布', icon: 'documentation' } },
       { path: 'warning', component: () => import('@/views/portal/teacher/warning/index'), name: 'TeacherWarning', meta: { title: '预警规则', icon: 'bell' } },
       { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分', icon: 'money' } },
+      // 【阶段7 AI批改】本地多模态大模型批改 + 教师终审 + 成绩判分发布
+      { path: 'ai', component: () => import('@/views/portal/teacher/ai/index'), name: 'TeacherAiReview', meta: { title: 'AI批改', icon: 'star' } },
       // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
       { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'TeacherMessage', meta: { title: '消息中心', icon: 'message' } },
       { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'TeacherTopic', meta: { title: '模块讨论', icon: 'chat' } },
@@ -112,6 +114,8 @@ export const constantRoutes = [
       { path: 'board', component: () => import('@/views/portal/student/board/index'), name: 'StudentBoard', meta: { title: '公示板', icon: 'clipboard' } },
       { path: 'modules', component: () => import('@/views/portal/student/modules/index'), name: 'StudentModules', meta: { title: '模块编辑', icon: 'form' } },
       { path: 'contribution', component: () => import('@/views/portal/student/contribution/index'), name: 'StudentContribution', meta: { title: '贡献率', icon: 'chart' } },
+      // 【阶段7成绩查看】教师发布后可查看小组/个人成绩与模块明细
+      { path: 'review', component: () => import('@/views/portal/student/review/index'), name: 'StudentReview', meta: { title: '我的成绩', icon: 'money' } },
       // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
       { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'StudentMessage', meta: { title: '消息中心', icon: 'message' } },
       { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'StudentTopic', meta: { title: '模块讨论', icon: 'chat' } },

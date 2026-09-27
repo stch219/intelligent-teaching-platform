@@ -39,6 +39,10 @@ public class TeStudentPortalController extends BaseController
     @Autowired
     private ITeStudentPortalService portalService;
 
+    /** AI批改与成绩服务（阶段7：学生端"我的成绩"） */
+    @Autowired
+    private com.ruoyi.teach.service.ITeReviewService reviewService;
+
     /**
      * 我的信息（学籍/班级/小组/角色/分工/指导教师/截止时间）
      */
@@ -204,5 +208,16 @@ public class TeStudentPortalController extends BaseController
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + fileName);
         response.getOutputStream().write(pdf);
         response.getOutputStream().flush();
+    }
+
+    /**
+     * 我的成绩（阶段7）：教师发布后可见组最终分/个人得分/各模块终分/本人贡献率；
+     * 批改过程对 学生不可见（仅见终分），未发布时仅返回 published=false
+     */
+    @PreAuthorize("@ss.hasRole('student')")
+    @GetMapping("/myReview")
+    public AjaxResult myReview()
+    {
+        return success(reviewService.myReview(getUserId()));
     }
 }

@@ -139,3 +139,33 @@ export function listScoreSet(classId) {
 export function saveScoreSet(classId, data) {
   return request({ url: '/teach/scoreset/' + classId, method: 'put', data: data })
 }
+
+// ---------------- AI批改与成绩判分（阶段7） ----------------
+// 批改总览（班级下小组：总稿状态/AI参考分/组最终分/批改数/发布状态）
+export function reviewBoard(classId) {
+  return request({ url: '/teach/review/board/' + classId, method: 'get' })
+}
+// 小组学生成绩列表（发布核对用）
+export function listScores(groupId) {
+  return request({ url: '/teach/review/' + groupId + '/scores', method: 'get' })
+}
+// 触发AI批改（模型不可用自动本地规则兜底；GPU约每模块5-15秒）
+export function runAiReview(groupId) {
+  return request({ url: '/teach/review/' + groupId, method: 'post', timeout: 330000 })
+}
+// 查看小组批改结果（AI分/评语/模型来源）
+export function listReview(groupId) {
+  return request({ url: '/teach/review/' + groupId, method: 'get' })
+}
+// 教师终审：逐模块核定分数并标记核查完成
+export function finalizeReview(groupId, data) {
+  return request({ url: '/teach/review/' + groupId + '/finalize', method: 'put', data: data })
+}
+// 成绩汇总（组分=Σ模块生效分；个人分=Σ生效分×贡献率）
+export function computeScore(groupId) {
+  return request({ url: '/teach/review/' + groupId + '/score', method: 'post' })
+}
+// 发布成绩（发布后组内学生可见）
+export function publishScore(groupId) {
+  return request({ url: '/teach/review/' + groupId + '/publish', method: 'post' })
+}

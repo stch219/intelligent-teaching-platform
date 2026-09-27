@@ -145,3 +145,13 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+# AI批改引擎配置（阶段7）
+ai:
+  engine:
+    # Python 推理服务地址（ai_engine/ai_server.py，同机部署）
+    base-url: http://127.0.0.1:8300
+    # 健康检查超时（毫秒）
+    health-timeout: 3000
+    # 批改请求超时（毫秒，CPU推理较慢需放宽；GPU通常每模块5-15秒）
+    grade-timeout: 300000

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】AI批改结果 Mapper 映射文件（表 te_ai_review，唯一键 group_id+module_code）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeAiReviewMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeAiReview" id="TeAiReviewResult">
+        <id     property="id"             column="id"              />
+        <result property="groupId"        column="group_id"        />
+        <result property="moduleCode"     column="module_code"     />
+        <result property="reviewProcess"  column="review_process"  />
+        <result property="aiScore"        column="ai_score"        />
+        <result property="similarity"     column="similarity"      />
+        <result property="modelName"      column="model_name"      />
+        <result property="teacherScore"   column="teacher_score"   />
+        <result property="teacherChecked" column="teacher_checked" />
+        <result property="checkedBy"      column="checked_by"      />
+        <result property="reviewTime"     column="review_time"     />
+        <result property="moduleMax"      column="module_score"    />
+    </resultMap>
+
+    <!-- 查询本组批改记录（联查模块名称与满分，便于前端直接渲染） -->
+    <select id="selectByGroup" parameterType="Long" resultMap="TeAiReviewResult">
+        select r.id, r.group_id, r.module_code, r.review_process, r.ai_score, r.similarity,
+               r.model_name, r.teacher_score, r.teacher_checked, r.checked_by, r.review_time,
+               mss.score as module_score
+        from te_ai_review r
+        left join te_group g on g.id = r.group_id
+        left join te_module_score_set mss
+               on mss.class_id = g.class_id and mss.module_code = r.module_code
+        where r.group_id = #{groupId}
+        order by r.module_code
+    </select>
+
+    <!-- 删除本组全部批改记录（重新批改前先清空） -->
+    <delete id="deleteByGroup" parameterType="Long">
+        delete from te_ai_review where group_id = #{groupId}
+    </delete>
+
+    <!-- 批量插入批改记录 -->
+    <insert id="batchInsert">
+        insert into te_ai_review
+            (group_id, module_code, review_process, ai_score, similarity,
+             model_name, teacher_score, teacher_checked, checked_by, review_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.groupId}, #{item.moduleCode}, #{item.reviewProcess}, #{item.aiScore},
+             #{item.similarity}, #{item.modelName}, #{item.teacherScore},
+             #{item.teacherChecked}, #{item.checkedBy}, #{item.reviewTime})
+        </foreach>
+    </insert>
+
+    <!-- 教师终审：更新核定分与核查状态 -->
+    <update id="updateTeacherCheck" parameterType="TeAiReview">
+        update te_ai_review
+        set teacher_score   = #{teacherScore},
+            teacher_checked = #{teacherChecked},
+            checked_by      = #{checkedBy}
+        where id = #{id}
+    </update>
+
+    <!-- 统计本组已批改记录数 -->
+    <select id="countByGroup" parameterType="Long" resultType="int">
+        select count(*) from te_ai_review where group_id = #{groupId}
+    </select>
+
+</mapper>

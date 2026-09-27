@@ -79,3 +79,9 @@ export function exportPdf() {
     responseType: 'blob'
   })
 }
+
+// ---------------- 我的成绩（阶段7） ----------------
+// 我的成绩（教师发布后可见：组最终分/个人得分/各模块终分/本人贡献率）
+export function getMyReview() {
+  return request({ url: '/teach/student/portal/myReview', method: 'get' })
+}
