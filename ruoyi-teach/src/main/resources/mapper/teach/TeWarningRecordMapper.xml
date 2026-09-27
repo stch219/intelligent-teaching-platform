@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】进度预警记录 Mapper 映射文件（表 te_warning_record，联查组名/班级名/任务名）
+     【注意】全局驼峰转换已关闭（mybatis-config.xml），resultMap 必须显式映射全部列
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeWarningRecordMapper">
+
+    <!-- 结果映射：基础列 + 联查展示列 -->
+    <resultMap type="TeWarningRecord" id="TeWarningRecordResult">
+        <id     property="id"         column="id"          />
+        <result property="classId"    column="class_id"    />
+        <result property="groupId"    column="group_id"    />
+        <result property="level"      column="level"       />
+        <result property="content"    column="content"     />
+        <result property="progress"   column="progress"    />
+        <result property="sendTime"   column="send_time"   />
+        <result property="resolved"   column="resolved"    />
+        <result property="groupName"  column="group_name"  />
+        <result property="className"  column="class_name"  />
+        <result property="taskName"   column="task_name"   />
+    </resultMap>
+
+    <!-- 通用查询：联查小组名、班级名、分配到的任务名（一组一任务，取最小ID） -->
+    <sql id="selectWarningRecordVo">
+        select r.id, r.class_id, r.group_id, r.level, r.content, r.progress, r.send_time, r.resolved,
+               g.group_name, c.class_name,
+               (select t.task_name from te_task_assign a
+                  left join te_task t on t.id = a.task_id
+                 where a.group_id = r.group_id order by a.id limit 1) as task_name
+        from te_warning_record r
+        left join te_group g on g.id = r.group_id
+        left join te_class c on c.id = r.class_id
+    </sql>
+
+    <!-- 查询某组某级别的未处置记录（扫描幂等查重） -->
+    <select id="selectUnresolved" resultMap="TeWarningRecordResult">
+        <include refid="selectWarningRecordVo"/>
+        where r.group_id = #{groupId} and r.level = #{level} and r.resolved = 0
+        limit 1
+    </select>
+
+    <!-- 新增预警记录 -->
+    <insert id="insertRecord" parameterType="TeWarningRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into te_warning_record (class_id, group_id, level, content, progress, send_time, resolved)
+        values (#{classId}, #{groupId}, #{level}, #{content}, #{progress}, #{sendTime}, 0)
+    </insert>
+
+    <!-- 重复扫描时刷新未处置记录（内容/完成率/发送时间以最新为准） -->
+    <update id="refreshRecord" parameterType="TeWarningRecord">
+        update te_warning_record
+        set content = #{content}, progress = #{progress}, send_time = #{sendTime}
+        where group_id = #{groupId} and level = #{level} and resolved = 0
+    </update>
+
+    <!-- 教师端：按班级查询预警记录（最新在前） -->
+    <select id="selectListByClass" parameterType="Long" resultMap="TeWarningRecordResult">
+        <include refid="selectWarningRecordVo"/>
+        where r.class_id = #{classId}
+        order by r.resolved asc, r.level desc, r.send_time desc
+    </select>
+
+    <!-- 学生端：按小组查询未处置预警记录（最新在前；已处置的不再提醒） -->
+    <select id="selectListByGroup" parameterType="Long" resultMap="TeWarningRecordResult">
+        <include refid="selectWarningRecordVo"/>
+        where r.group_id = #{groupId} and r.resolved = 0
+        order by r.send_time desc
+    </select>
+
+    <!-- 教师处置：标记已忽略/已处置 -->
+    <update id="resolve" parameterType="Long">
+        update te_warning_record set resolved = 1 where id = #{id}
+    </update>
+
+    <!-- 教师仪表盘：按班级统计各级别未处置记录数 -->
+    <select id="countByClassGroupByLevel" parameterType="Long" resultType="java.util.HashMap">
+        select level as `level`, count(1) as `cnt`
+        from te_warning_record
+        where class_id = #{classId} and resolved = 0
+        group by level
+    </select>
+
+    <!-- 学生仪表盘：统计本组未处置预警数 -->
+    <select id="countUnresolvedByGroup" parameterType="Long" resultType="int">
+        select count(1) from te_warning_record where group_id = #{groupId} and resolved = 0
+    </select>
+
+</mapper>

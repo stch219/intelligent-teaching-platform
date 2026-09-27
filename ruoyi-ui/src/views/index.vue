@@ -17,6 +17,23 @@
       </div>
     </div>
 
+    <!-- 平台规模统计（阶段8仪表盘：全平台计数 + AI批改进度） -->
+    <el-row :gutter="16" class="stat-row">
+      <el-col :sm="8" :lg="4" v-for="s in statCards" :key="s.label">
+        <el-card class="stat-card" shadow="hover">
+          <div class="stat-num">{{ s.value }}</div>
+          <div class="stat-label">{{ s.label }}</div>
+        </el-card>
+      </el-col>
+      <el-col :sm="8" :lg="4">
+        <el-card class="stat-card" shadow="hover">
+          <el-progress type="circle" :percentage="Number(stats.aiReviewRate) || 0"
+                       :width="64" :stroke-width="8" />
+          <div class="stat-label" style="margin-top: 6px">AI 批改覆盖</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 快捷入口卡片：管理员四大常用功能 -->
     <el-row :gutter="16" class="entry-row">
       <el-col :sm="12" :lg="6" v-for="item in entries" :key="item.path">
@@ -32,6 +49,21 @@
       </el-col>
     </el-row>
 
+    <!-- 最近预警速览（跨班级未处置预警，阶段8） -->
+    <el-card shadow="never" class="warn-card" v-if="stats.recentWarnings && stats.recentWarnings.length > 0">
+      <template #header><span class="entry-name">最近未处置预警</span></template>
+      <el-table :data="stats.recentWarnings" size="small">
+        <el-table-column label="级别" width="90">
+          <template #default="{ row }">
+            <el-tag :type="levelTag(row.level)" size="small">{{ levelText(row.level) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="班级" prop="className" width="140" />
+        <el-table-column label="预警内容" prop="content" min-width="320" show-overflow-tooltip />
+        <el-table-column label="触发时间" prop="sendTime" width="160" />
+      </el-table>
+    </el-card>
+
     <!-- 说明文字 -->
     <el-alert
       class="tip"
@@ -44,13 +76,51 @@
 </template>
 
 <script setup>
+// ============================================================================
+// 【功能】管理员首页逻辑：品牌横幅 + 平台统计仪表盘 + 快捷入口 + 预警速览
+// ============================================================================
+import { adminDashboard } from '@/api/teach/dashboard'
+
 // 快捷入口配置：名称 / 描述 / 路由 / 图标 / 主题色
 const entries = [
   { name: '注册审批', desc: '审批学生注册申请', path: '/teach/registration', icon: 'form', color: '#409EFF' },
   { name: '教师管理', desc: '教师账号管理（上限4名）', path: '/teach/teacher', icon: 'peoples', color: '#67C23A' },
   { name: '学生管理', desc: '学生账号层级管理', path: '/teach/student', icon: 'user', color: '#E6A23C' },
-  { name: '课程设计管理', desc: '教师教学过程门户', path: '/teacher/index', icon: 'education', color: '#9B59E6' }
+  { name: '课程设计管理', desc: '教师教学过程门户', path: '/teacher/index', icon: 'education', color: '#9B59E6' },
+  // 【阶段8帮助中心】管理员维护师生共用帮助条目（隐藏路由入口）
+  { name: '帮助管理', desc: '维护帮助中心指引内容', path: '/help-admin', icon: 'question', color: '#00B4D8' }
 ]
+
+// 平台统计仪表盘数据
+const stats = ref({})
+
+/** 统计卡配置（依赖 stats 响应式取值） */
+const statCards = computed(() => [
+  { label: '班级数', value: stats.value.classCount ?? '-' },
+  { label: '教师数', value: stats.value.teacherCount ?? '-' },
+  { label: '学生数', value: stats.value.studentCount ?? '-' },
+  { label: '小组数', value: stats.value.groupCount ?? '-' },
+  { label: '任务数', value: stats.value.taskCount ?? '-' },
+  { label: '已发布成绩', value: stats.value.publishedScore ?? '-' }
+])
+
+/** 预警级别文本（1黄 2橙 3红） */
+function levelText(level) {
+  return { 1: '一般-黄', 2: '重要-橙', 3: '紧急-红' }[level] || '未知'
+}
+/** 预警级别标签颜色 */
+function levelTag(level) {
+  return { 1: 'warning', 2: 'warning', 3: 'danger' }[level] || 'info'
+}
+
+/** 加载平台统计 */
+async function loadStats() {
+  try {
+    const res = await adminDashboard()
+    stats.value = res.data || {}
+  } catch (ignored) {}
+}
+loadStats()
 </script>
 
 <style lang="scss" scoped>
@@ -91,6 +161,16 @@ const entries = [
   .entry-name { font-size: 15px; font-weight: 600; color: #1d2b3a; }
   .entry-desc { font-size: 12px; color: #86909c; margin-top: 4px; }
 }
+
+/* 平台统计卡（阶段8仪表盘） */
+.stat-row { margin-top: 16px; }
+.stat-card {
+  margin-bottom: 16px; text-align: center; border-radius: 10px;
+  .stat-num { font-size: 26px; font-weight: 700; color: #1d2b3a; }
+  .stat-label { font-size: 12px; color: #86909c; margin-top: 4px; }
+}
+
+.warn-card { margin-top: 4px; border-radius: 10px; }
 
 .tip { margin-top: 6px; }
 </style>

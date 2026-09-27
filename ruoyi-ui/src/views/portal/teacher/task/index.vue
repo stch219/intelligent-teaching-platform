@@ -31,6 +31,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="taskName" label="任务题目" min-width="220" show-overflow-tooltip />
+        <!-- 【阶段8三级预警】截止时间是扫描引擎的判定依据（距截止N天/已逾期） -->
+        <el-table-column label="截止时间" width="170" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.deadline">{{ scope.row.deadline }}</span>
+            <el-tag v-else type="info" size="small">未设置</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="teacherName" label="发布教师" width="110" />
         <el-table-column label="已分配组数" width="100" align="center">
           <template #default="scope">
@@ -54,6 +61,11 @@
       <el-form ref="taskRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="任务题目" prop="taskName">
           <el-input v-model="form.taskName" placeholder="如：汽车动力性计算与分析" maxlength="200" show-word-limit />
+        </el-form-item>
+        <!-- 【阶段8三级预警】设置总稿提交截止时间，预警扫描引擎据此判定黄/橙/红 -->
+        <el-form-item label="截止时间" prop="deadline">
+          <el-date-picker v-model="form.deadline" type="datetime" placeholder="选择总稿提交截止时间（选填）"
+                          value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
         </el-form-item>
         <el-form-item label="设计目标" prop="designGoal">
           <el-input v-model="form.designGoal" type="textarea" :rows="3" maxlength="1000" show-word-limit />
@@ -149,7 +161,8 @@ async function loadAll() {
 
 /** 打开新建/编辑对话框 */
 function openDialog(row) {
-  form.value = row ? { ...row } : { classId: classId.value, taskName: '', designGoal: '', requirement: '', gradingStandard: '', tips: '' }
+  // 新建时 deadline 置空（截止时间选填，阶段8预警扫描依赖）
+  form.value = row ? { ...row } : { classId: classId.value, taskName: '', deadline: null, designGoal: '', requirement: '', gradingStandard: '', tips: '' }
   dialogVisible.value = true
 }
 

@@ -42,6 +42,10 @@ public class TeTask extends BaseEntity
     /** 重要提示 */
     private String tips;
 
+    /** 提交截止时间（三级预警扫描的时间基准，阶段8新增） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date deadline;
+
     /** 发布教师用户ID */
     private Long teacherId;
 
@@ -135,6 +139,16 @@ public class TeTask extends BaseEntity
     public void setTips(String tips)
     {
         this.tips = tips;
+    }
+
+    public Date getDeadline()
+    {
+        return deadline;
+    }
+
+    public void setDeadline(Date deadline)
+    {
+        this.deadline = deadline;
     }
 
     public Long getTeacherId()

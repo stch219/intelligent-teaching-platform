@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】阶段8 聚合统计 Mapper 映射文件（三端仪表盘 + 预警扫描引擎共用）
+     【注意】全局驼峰转换已关闭，resultType=map 的列别名用小写下划线，
+             Java 侧按别名取值（保持与 XML 一致即可）
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeDashboardMapper">
+
+    <!-- ==================== 管理员端全平台统计 ==================== -->
+
+    <select id="countClass" resultType="int">
+        select count(1) from te_class
+    </select>
+
+    <select id="countStudent" resultType="int">
+        select count(1) from te_student
+    </select>
+
+    <select id="countTask" resultType="int">
+        select count(1) from te_task
+    </select>
+
+    <select id="countGroup" resultType="int">
+        select count(1) from te_group
+    </select>
+
+    <select id="countAiReviewedGroup" resultType="int">
+        select count(1) from te_group where ai_ref_score is not null
+    </select>
+
+    <select id="countPublishedScore" resultType="int">
+        select count(1) from te_score where is_published = 1
+    </select>
+
+    <!-- 最近5条未处置预警（联查班级名/组名，管理员首页速览） -->
+    <select id="selectRecentWarnings" resultType="java.util.HashMap">
+        select r.id, r.level, r.content, r.progress, r.send_time as sendTime,
+               c.class_name as className, g.group_name as groupName
+        from te_warning_record r
+        left join te_class c on c.id = r.class_id
+        left join te_group g on g.id = r.group_id
+        where r.resolved = 0
+        order by r.send_time desc
+        limit 5
+    </select>
+
+    <!-- ==================== 教师端本班统计 ==================== -->
+
+    <!-- 各组进度总览：已提交模块数 + 分配任务的截止时间/任务名（一组一任务取最小分配ID） -->
+    <select id="selectGroupProgressByClass" parameterType="Long" resultType="java.util.HashMap">
+        select g.id as groupId, g.group_name as groupName, g.submit_status as submitStatus,
+               g.ai_ref_score as aiRefScore,
+               (select count(1) from te_module_content mc
+                 where mc.group_id = g.id and mc.status = 2) as submitted,
+               (select t.deadline from te_task_assign a
+                  left join te_task t on t.id = a.task_id
+                 where a.group_id = g.id order by a.id limit 1) as deadline,
+               (select t.task_name from te_task_assign a
+                  left join te_task t on t.id = a.task_id
+                 where a.group_id = g.id order by a.id limit 1) as taskName
+        from te_group g
+        where g.class_id = #{classId}
+        order by g.group_order
+    </select>
+
+    <!-- 本班成绩分布：按已发布成绩分四段统计 -->
+    <select id="selectScoreDistribution" parameterType="Long" resultType="java.util.HashMap">
+        select t.`range` as `range`, count(1) as `cnt` from (
+            select case when s.final_score >= 90 then '90-100'
+                        when s.final_score >= 80 then '80-89'
+                        when s.final_score >= 60 then '60-79'
+                        else '60以下' end as `range`
+            from te_score s
+            join te_student st on st.user_id = s.user_id
+            where s.class_id = #{classId} and s.is_published = 1
+        ) t group by t.`range`
+    </select>
+
+    <select id="countSubmittedGroup" parameterType="Long" resultType="int">
+        select count(1) from te_group where class_id = #{classId} and submit_status = 1
+    </select>
+
+    <!-- ==================== 学生端个人统计 ==================== -->
+
+    <select id="countSubmittedModule" parameterType="Long" resultType="int">
+        select count(1) from te_module_content where group_id = #{groupId} and status = 2
+    </select>
+
+    <select id="countMyContributionConfirm" resultType="int">
+        select count(1) from te_confirm_record
+        where group_id = #{groupId} and user_id = #{userId} and confirm_type = 2
+    </select>
+
+    <select id="selectMyFinalScore" parameterType="Long" resultType="java.lang.Double">
+        select final_score from te_score where user_id = #{userId} and is_published = 1
+    </select>
+
+    <!-- ==================== 预警扫描引擎支撑 ==================== -->
+
+    <select id="selectStudentUserIdsByGroup" parameterType="Long" resultType="java.lang.Long">
+        select user_id from te_student where group_id = #{groupId}
+    </select>
+
+</mapper>

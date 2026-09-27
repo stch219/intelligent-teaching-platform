@@ -17,6 +17,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="requirement"      column="requirement"      />
         <result property="gradingStandard"  column="grading_standard" />
         <result property="tips"             column="tips"             />
+        <result property="deadline"         column="deadline"         />
         <result property="teacherId"        column="teacher_id"       />
         <result property="createTime"       column="create_time"      />
         <result property="updateTime"       column="update_time"      />
@@ -28,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 通用查询：联查班级名、教师姓名、已分配组数 -->
     <sql id="selectTeTaskVo">
         select t.id, t.task_code, t.task_name, t.class_id, t.design_goal, t.requirement,
-               t.grading_standard, t.tips, t.teacher_id, t.create_time, t.update_time,
+               t.grading_standard, t.tips, t.deadline, t.teacher_id, t.create_time, t.update_time,
                c.class_name, u.nick_name as teacher_name,
                (select count(1) from te_task_assign a where a.task_id = t.id) as assigned_count
         from te_task t
@@ -69,6 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="requirement != null">requirement,</if>
             <if test="gradingStandard != null">grading_standard,</if>
             <if test="tips != null">tips,</if>
+            <if test="deadline != null">deadline,</if>
             <if test="teacherId != null">teacher_id,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
@@ -80,6 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="requirement != null">#{requirement},</if>
             <if test="gradingStandard != null">#{gradingStandard},</if>
             <if test="tips != null">#{tips},</if>
+            <if test="deadline != null">#{deadline},</if>
             <if test="teacherId != null">#{teacherId},</if>
             <if test="createTime != null">#{createTime},</if>
         </trim>
@@ -94,6 +97,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="requirement != null">requirement = #{requirement},</if>
             <if test="gradingStandard != null">grading_standard = #{gradingStandard},</if>
             <if test="tips != null">tips = #{tips},</if>
+            <if test="deadline != null">deadline = #{deadline},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where id = #{id}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     【功能】帮助中心 Mapper 映射文件（表 te_help）
+     【注意】全局驼峰转换已关闭（mybatis-config.xml），resultMap 必须显式映射全部列
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeHelpMapper">
+
+    <!-- 结果映射 -->
+    <resultMap type="TeHelp" id="TeHelpResult">
+        <id     property="id"         column="id"          />
+        <result property="title"      column="title"       />
+        <result property="category"   column="category"    />
+        <result property="content"    column="content"     />
+        <result property="sortOrder"  column="sort_order"  />
+        <result property="status"     column="status"      />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <!-- 条件查询帮助条目（分类内按 sort_order 升序） -->
+    <select id="selectTeHelpList" parameterType="TeHelp" resultMap="TeHelpResult">
+        select id, title, category, content, sort_order, status, create_time, update_time
+        from te_help
+        <where>
+            <if test="category != null and category != ''">and category = #{category}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+            <if test="title != null and title != ''">and title like concat('%', #{title}, '%')</if>
+        </where>
+        order by category, sort_order, id
+    </select>
+
+    <!-- 按ID查询 -->
+    <select id="selectTeHelpById" parameterType="Long" resultMap="TeHelpResult">
+        select id, title, category, content, sort_order, status, create_time, update_time
+        from te_help where id = #{id}
+    </select>
+
+    <!-- 新增帮助条目 -->
+    <insert id="insertTeHelp" parameterType="TeHelp" useGeneratedKeys="true" keyProperty="id">
+        insert into te_help (title, category, content, sort_order, status, create_time)
+        values (#{title}, #{category}, #{content}, #{sortOrder}, #{status}, #{createTime})
+    </insert>
+
+    <!-- 修改帮助条目 -->
+    <update id="updateTeHelp" parameterType="TeHelp">
+        update te_help
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="category != null and category != ''">category = #{category},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            update_time = now()
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除 -->
+    <delete id="deleteTeHelpByIds" parameterType="Long">
+        delete from te_help where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

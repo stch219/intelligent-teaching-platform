@@ -48,6 +48,12 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    // 【阶段8帮助中心管理】管理员维护帮助条目（隐藏路由，从管理员首页「帮助管理」快捷入口进入）
+    path: '/help-admin',
+    component: () => import('@/views/portal/common/HelpAdmin'),
+    hidden: true
+  },
+  {
     path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),
     hidden: true
@@ -97,7 +103,9 @@ export const constantRoutes = [
       // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
       { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'TeacherMessage', meta: { title: '消息中心', icon: 'message' } },
       { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'TeacherTopic', meta: { title: '模块讨论', icon: 'chat' } },
-      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'TeacherNotice', meta: { title: '班级公告', icon: 'documentation' } }
+      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'TeacherNotice', meta: { title: '班级公告', icon: 'documentation' } },
+      // 【阶段8帮助中心】师生共用静态指引（内容由管理员在 /help-admin 维护）
+      { path: 'help', component: () => import('@/views/portal/common/HelpCenter'), name: 'TeacherHelp', meta: { title: '帮助中心', icon: 'question' } }
     ]
   },
   {
@@ -119,7 +127,9 @@ export const constantRoutes = [
       // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
       { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'StudentMessage', meta: { title: '消息中心', icon: 'message' } },
       { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'StudentTopic', meta: { title: '模块讨论', icon: 'chat' } },
-      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'StudentNotice', meta: { title: '班级公告', icon: 'documentation' } }
+      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'StudentNotice', meta: { title: '班级公告', icon: 'documentation' } },
+      // 【阶段8帮助中心】师生共用静态指引（内容由管理员在 /help-admin 维护）
+      { path: 'help', component: () => import('@/views/portal/common/HelpCenter'), name: 'StudentHelp', meta: { title: '帮助中心', icon: 'question' } }
     ]
   },
   {

@@ -13,6 +13,21 @@
       <p class="page-sub">欢迎回到智能教学平台，开始你的课程设计之旅</p>
     </div>
 
+    <!-- 学习状态统计卡（阶段8仪表盘：模块完成度/贡献率确认/未读/预警/成绩） -->
+    <div class="stat-row" v-if="stats.inGroup">
+      <div class="stat-cell" v-for="s in statCards" :key="s.label">
+        <div class="stat-num" :style="{ color: s.color }">{{ s.value }}</div>
+        <div class="stat-label">{{ s.label }}</div>
+      </div>
+    </div>
+
+    <!-- 未处置预警横幅（阶段8三级预警：黄/橙/红染色展示） -->
+    <div v-for="w in openWarnings" :key="w.id" class="warn-banner" :class="'level-' + w.level">
+      <el-tag :type="levelTag(w.level)" size="small" effect="dark">{{ levelText(w.level) }}预警</el-tag>
+      <span class="warn-text">{{ w.content }}</span>
+      <span class="warn-time">{{ w.sendTime }}</span>
+    </div>
+
     <!-- 我的信息卡 -->
     <el-row :gutter="16">
       <el-col :span="16">
@@ -89,9 +104,12 @@
 
 <script setup name="StudentHome">
 // ============================================================================
-// 【功能】学生工作台逻辑：我的信息 + 截止倒计时 + 模块进度概览 + 快捷入口
+// 【功能】学生工作台逻辑：学习状态统计 + 预警横幅 + 我的信息 + 截止倒计时 +
+//        模块进度概览 + 快捷入口 + WebSocket 实时预警提醒（阶段8升级）
 // ============================================================================
 import { getMyInfo, listModules } from '@/api/teach/studentPortal'
+import { studentDashboard } from '@/api/teach/dashboard'
+import { connectWs, onWsMsg, closeWs } from '@/utils/websocket'
 import useUserStore from '@/store/modules/user'
 
 const router = useRouter()
@@ -100,6 +118,8 @@ const userStore = useUserStore()
 // 我的信息与模块看板数据
 const info = ref({})
 const modules = ref([])
+// 学习状态统计（阶段8仪表盘：含本组预警列表）
+const stats = ref({})
 
 // 快捷入口配置
 const quickLinks = [
@@ -109,11 +129,40 @@ const quickLinks = [
   { path: '/student/contribution', title: '贡献率', sub: '组内分配与确认（和为100%）', icon: 'DataAnalysis', color: '#F56C6C' }
 ]
 
+/** 统计卡配置（inGroup 为 true 时展示） */
+const statCards = computed(() => [
+  { label: '模块完成', value: (stats.value.moduleSubmitted ?? '-') + '/' + (stats.value.moduleTotal ?? 10), color: '#409eff' },
+  { label: '贡献率确认', value: stats.value.contributionConfirmed === 1 ? '已确认' : '未确认', color: stats.value.contributionConfirmed === 1 ? '#67c23a' : '#e6a23c' },
+  { label: '未读消息', value: stats.value.unreadCount ?? '-', color: '#909399' },
+  { label: '未处置预警', value: stats.value.warningCount ?? '-', color: (stats.value.warningCount || 0) > 0 ? '#f56c6c' : '#67c23a' },
+  { label: '最终成绩', value: stats.value.finalScore != null ? stats.value.finalScore : '未发布', color: '#e6a23c' }
+])
+
+/** 未处置预警列表（横幅数据源） */
+const openWarnings = computed(() => (stats.value.warnings || []).filter(w => w.resolved === 0))
+
+/** 预警级别文本（1黄 2橙 3红） */
+function levelText(level) {
+  return { 1: '一般-黄', 2: '重要-橙', 3: '紧急-红' }[level] || '未知'
+}
+/** 预警级别标签颜色 */
+function levelTag(level) {
+  return { 1: 'warning', 2: 'warning', 3: 'danger' }[level] || 'info'
+}
+
 /** 加载我的信息与模块看板 */
 async function load() {
   const [infoRes, moduleRes] = await Promise.all([getMyInfo(), listModules()])
   info.value = infoRes.data || {}
   modules.value = moduleRes.data || []
+}
+
+/** 加载学习状态统计（模块完成度/确认状态/未读/预警/成绩） */
+async function loadStats() {
+  try {
+    const res = await studentDashboard()
+    stats.value = res.data || {}
+  } catch (ignored) {}
 }
 
 /** 角色文本 */
@@ -149,7 +198,30 @@ function deadlineText(deadline) {
   return '剩 ' + d + ' 天'
 }
 
+// 建立长连接并订阅预警推送：教师端扫描后本组命中会实时收到 warning 报文
+let offWs = null
+onMounted(() => {
+  connectWs()
+  offWs = onWsMsg((msg) => {
+    if (msg.type === 'warning') {
+      // 弹出实时预警通知（红色预警用 error 样式，不自动关闭）
+      ElNotification({
+        title: '收到' + levelText(msg.level) + '预警',
+        message: msg.content,
+        type: Number(msg.level) === 3 ? 'error' : 'warning',
+        duration: 0
+      })
+      loadStats() // 刷新统计卡与预警横幅
+    }
+  })
+})
+onUnmounted(() => {
+  if (offWs) offWs() // 解绑消息回调
+  closeWs()          // 离开工作台主动断开长连接
+})
+
 load()
+loadStats()
 </script>
 
 <style lang="scss" scoped>
@@ -157,6 +229,33 @@ load()
 .page-title { margin: 0 0 6px; font-size: 22px; color: #1d2b3a; }
 .page-sub { margin: 0 0 20px; color: #86909c; font-size: 14px; }
 .section-title { margin: 0 0 14px; font-size: 16px; color: #1d2b3a; }
+
+/* 学习状态统计行：5 等分弹性卡片 */
+.stat-row {
+  display: flex; gap: 16px; margin-bottom: 16px;
+
+  .stat-cell {
+    flex: 1; text-align: center; padding: 14px 0;
+    background: #fff; border: 1px solid #ebeef5; border-radius: 10px;
+
+    .stat-num { font-size: 22px; font-weight: 700; }
+    .stat-label { font-size: 12px; color: #86909c; margin-top: 4px; }
+  }
+}
+
+/* 未处置预警横幅：按级别染左侧色条 */
+.warn-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; margin-bottom: 10px;
+  border-radius: 8px; border: 1px solid #ebeef5; background: #fff;
+
+  &.level-1 { border-left: 4px solid #e6a23c; background: #fdf6ec; }
+  &.level-2 { border-left: 4px solid #f56c6c; background: #fef0f0; }
+  &.level-3 { border-left: 4px solid #f56c6c; background: #fef0f0; }
+  .warn-text { flex: 1; font-size: 13px; color: #303133; }
+  .warn-time { font-size: 12px; color: #86909c; }
+}
+
 
 .info-card { border-radius: 10px; }
 .card-title { font-weight: 600; color: #1d2b3a; }
