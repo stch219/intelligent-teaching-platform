@@ -61,3 +61,21 @@ export function confirmContribution() {
 export function confirmDuty(memberUserId) {
   return request({ url: '/teach/student/portal/duty/confirm/' + memberUserId, method: 'post' })
 }
+
+// ---------------- 总稿提交与导出（阶段5） ----------------
+// 总稿合规预检（4项检查：组长身份/模块完成/分工确认/贡献率）
+export function getSubmitPrecheck() {
+  return request({ url: '/teach/student/portal/submitPrecheck', method: 'get' })
+}
+// 提交总稿（预检全过后封面落库锁定 + 小组置已提交）
+export function submitFinal() {
+  return request({ url: '/teach/student/portal/submitFinal', method: 'post' })
+}
+// 导出总稿PDF（封面+目录+10模块正文；responseType blob 接收二进制流）
+export function exportPdf() {
+  return request({
+    url: '/teach/student/portal/exportPdf',
+    method: 'get',
+    responseType: 'blob'
+  })
+}

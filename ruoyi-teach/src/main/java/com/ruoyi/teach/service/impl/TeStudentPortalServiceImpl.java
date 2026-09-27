@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.teach.domain.TeClass;
 import com.ruoyi.teach.domain.TeContribution;
+import com.ruoyi.teach.domain.TeGroup;
 import com.ruoyi.teach.domain.TeMaterial;
 import com.ruoyi.teach.domain.TeModuleContent;
 import com.ruoyi.teach.domain.TeModuleScoreSet;
@@ -24,6 +25,7 @@ import com.ruoyi.teach.domain.TeTask;
 import com.ruoyi.teach.domain.TeTaskAssign;
 import com.ruoyi.teach.mapper.TeClassMapper;
 import com.ruoyi.teach.mapper.TeContributionMapper;
+import com.ruoyi.teach.mapper.TeGroupMapper;
 import com.ruoyi.teach.mapper.TeMaterialMapper;
 import com.ruoyi.teach.mapper.TeModuleContentMapper;
 import com.ruoyi.teach.mapper.TeModuleScoreSetMapper;
@@ -44,6 +46,9 @@ import com.ruoyi.teach.service.ITeStudentPortalService;
  *         - "任务要求"模块（编号2）：本组无内容时自动由任务要素合成只读展示
  *         - 贡献率：仅组长可分配；模块5-10每模块组内合计必须=100%；
  *           重分配后组员需重新确认
+ *         - 总稿引擎（阶段5）：封面（模块1）系统合成；合规预检4项
+ *           （组长身份/模块全提交/分工全确认/贡献率分配并全员确认）；
+ *           提交总稿 = 封面落库锁定 + 小组置已提交 + 组长分工自认
  * ============================================================================
  */
 @Service
@@ -72,6 +77,9 @@ public class TeStudentPortalServiceImpl implements ITeStudentPortalService
 
     @Autowired
     private TeContributionMapper contributionMapper;
+
+    @Autowired
+    private TeGroupMapper groupMapper;
 
     // ------------------------------------------------------------------
     // ① 我的信息 + 组内角色选定
@@ -258,6 +266,11 @@ public class TeStudentPortalServiceImpl implements ITeStudentPortalService
         if (moduleCode == 2L && (content == null || isBlank(content.getContent())))
         {
             row.put("content", buildTaskRequirementHtml(student.getClassId(), student.getGroupId()));
+        }
+        // 封面模块（编号1，阶段5）：本组无内容时由系统实时合成封面（提交总稿时正式落库）
+        if (moduleCode == 1L && (content == null || isBlank(content.getContent())))
+        {
+            row.put("content", buildCoverHtml(student));
         }
         return row;
     }
@@ -577,6 +590,359 @@ public class TeStudentPortalServiceImpl implements ITeStudentPortalService
     }
 
     // ------------------------------------------------------------------
+    // ⑥ 总稿合规预检 + 提交总稿（阶段5 系统引擎）
+    // ------------------------------------------------------------------
+
+    /**
+     * 总稿合规预检：共4项检查（顺序即前端展示顺序）
+     * ①组长身份：仅组长可发起预检与提交
+     * ②模块完成：学生可编辑模块（editable=1）必须全部提交锁定
+     *   （封面/任务要求/参数配置为只读合成模块，不要求学生提交）
+     * ③分工确认：全部组员已填报分工且经组长确认（组长本人提交时自动确认）
+     * ④贡献率：模块5-10每模块覆盖全组成员分配，且全员均已确认
+     */
+    @Override
+    public List<Map<String, Object>> submitPrecheck(Long userId)
+    {
+        TeStudent student = getStudentChecked(userId);
+        if (student.getGroupId() == null)
+        {
+            throw new ServiceException("你尚未分组，无法进行总稿预检");
+        }
+        boolean isLeader = student.getRoleType() != null && (student.getRoleType() == 1L || student.getRoleType() == 3L);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        // ① 组长身份检查
+        Map<String, Object> check1 = new HashMap<>();
+        check1.put("code", "leader");
+        check1.put("item", "组长身份");
+        check1.put("passed", isLeader);
+        check1.put("detail", isLeader ? "你是本组组长，可以发起总稿提交" : "仅组长可提交总稿，请联系组长操作");
+        result.add(check1);
+
+        // ② 模块完成检查：可编辑模块全部提交（status=2）
+        List<Map<String, Object>> board = contentMapper.selectModuleBoard(student.getClassId(), student.getGroupId());
+        List<String> unfinished = new ArrayList<>();
+        int editableCount = 0;
+        for (Map<String, Object> item : board)
+        {
+            // 只读合成模块（封面/任务要求/参数配置）无需学生提交，跳过
+            if (toLong(item.get("editable")) == null || toLong(item.get("editable")) != 1L)
+            {
+                continue;
+            }
+            editableCount++;
+            Long status = toLong(item.get("status"));
+            if (status == null || status != 2L)
+            {
+                unfinished.add(String.valueOf(item.get("moduleName")));
+            }
+        }
+        boolean modulesPassed = editableCount > 0 && unfinished.isEmpty();
+        Map<String, Object> check2 = new HashMap<>();
+        check2.put("code", "modules");
+        check2.put("item", "模块完成度");
+        check2.put("passed", modulesPassed);
+        check2.put("detail", modulesPassed
+                ? editableCount + "个可编辑模块已全部提交锁定"
+                : "还有未提交的模块：" + String.join("、", unfinished));
+        result.add(check2);
+
+        // ③ 分工确认检查：组员全部填报分工并经组长确认
+        TeStudent memberQuery = new TeStudent();
+        memberQuery.setGroupId(student.getGroupId());
+        List<TeStudent> members = studentMapper.selectTeStudentList(memberQuery);
+        List<String> dutyTodo = new ArrayList<>();
+        for (TeStudent mate : members)
+        {
+            boolean mateIsLeader = mate.getRoleType() != null && (mate.getRoleType() == 1L || mate.getRoleType() == 3L);
+            if (mateIsLeader)
+            {
+                continue; // 组长本人提交时自动确认分工，不在此拦截
+            }
+            if (isBlank(mate.getDutyAssignment()) || mate.getDutyStatus() == null || mate.getDutyStatus() != 1L)
+            {
+                dutyTodo.add(mate.getNickName());
+            }
+        }
+        Map<String, Object> check3 = new HashMap<>();
+        check3.put("code", "duty");
+        check3.put("item", "组员分工确认");
+        check3.put("passed", dutyTodo.isEmpty());
+        check3.put("detail", dutyTodo.isEmpty()
+                ? "全部组员分工已确认"
+                : "以下组员未填报或未确认分工：" + String.join("、", dutyTodo));
+        result.add(check3);
+
+        // ④ 贡献率检查：模块5-10每模块覆盖全组成员且全员已确认
+        List<TeContribution> rows = contributionMapper.selectByGroup(student.getGroupId());
+        // 按模块归集行数，并记录未确认行的成员
+        Map<Long, List<TeContribution>> byModule = new LinkedHashMap<>();
+        Set<String> unconfirmedNames = new java.util.TreeSet<>();
+        for (TeContribution row : rows)
+        {
+            byModule.computeIfAbsent(row.getModuleCode(), k -> new ArrayList<>()).add(row);
+            if (row.getConfirmed() == null || row.getConfirmed() != 1L)
+            {
+                unconfirmedNames.add(row.getNickName());
+            }
+        }
+        List<String> missingModules = new ArrayList<>();
+        for (long code = 5; code <= 10; code++)
+        {
+            List<TeContribution> moduleRows = byModule.get(code);
+            if (moduleRows == null || moduleRows.size() < members.size())
+            {
+                missingModules.add(String.valueOf(code));
+            }
+        }
+        boolean contribPassed = missingModules.isEmpty() && unconfirmedNames.isEmpty();
+        Map<String, Object> check4 = new HashMap<>();
+        check4.put("code", "contribution");
+        check4.put("item", "贡献率分配与确认");
+        check4.put("passed", contribPassed);
+        check4.put("detail", contribPassed
+                ? "模块5-10已按成员分配贡献率且全员确认"
+                : (missingModules.isEmpty() ? "" : "模块" + String.join("、", missingModules) + "未完成全员分配；")
+                  + (unconfirmedNames.isEmpty() ? "" : "以下成员未确认贡献率：" + String.join("、", unconfirmedNames)));
+        result.add(check4);
+
+        return result;
+    }
+
+    /**
+     * 提交总稿（事务）：预检全过 → 封面落库锁定 → 小组置已提交 → 组长分工自认
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void submitFinal(Long userId)
+    {
+        TeStudent student = getStudentChecked(userId);
+        if (student.getGroupId() == null)
+        {
+            throw new ServiceException("你尚未分组，无法提交总稿");
+        }
+        TeGroup group = groupMapper.selectById(student.getGroupId());
+        if (group == null)
+        {
+            throw new ServiceException("小组数据异常，请联系教师");
+        }
+        // 幂等拦截：已提交的小组不允许重复提交
+        if (group.getSubmitStatus() != null && group.getSubmitStatus() == 1L)
+        {
+            throw new ServiceException("本组总稿已于 "
+                    + (group.getSubmitTime() == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(group.getSubmitTime()))
+                    + " 提交，不可重复提交");
+        }
+
+        // 预检未全过则汇总所有未通过项一次性提示
+        StringBuilder failMsg = new StringBuilder();
+        for (Map<String, Object> check : submitPrecheck(userId))
+        {
+            if (!Boolean.TRUE.equals(check.get("passed")))
+            {
+                if (failMsg.length() > 0)
+                {
+                    failMsg.append("；");
+                }
+                failMsg.append(check.get("item")).append("：").append(check.get("detail"));
+            }
+        }
+        if (failMsg.length() > 0)
+        {
+            throw new ServiceException("总稿提交未通过合规预检——" + failMsg);
+        }
+
+        // 封面HTML正式落库写入模块1并提交锁定（无记录则新建，有草稿则乐观锁覆盖）
+        String coverHtml = buildCoverHtml(student);
+        long words = stripHtml(coverHtml).length();
+        String operator = student.getStudentNo();
+        TeModuleContent cover = contentMapper.selectByGroupModule(student.getGroupId(), 1L);
+        if (cover == null)
+        {
+            TeModuleContent insert = new TeModuleContent();
+            insert.setGroupId(student.getGroupId());
+            insert.setModuleCode(1L);
+            insert.setContent(coverHtml);
+            insert.setStatus(2L);           // 直接提交态
+            insert.setProgress(100L);       // 封面系统生成视为完成
+            insert.setWordCount(words);
+            insert.setItemCount(countLines(stripHtml(coverHtml)));
+            insert.setCreateBy(operator);
+            insert.setUpdateBy(operator);
+            try
+            {
+                contentMapper.insertTeModuleContent(insert);
+            }
+            catch (DuplicateKeyException e)
+            {
+                // 并发下另一组长同时落库 → 转为更新，版本取库内最新
+                cover = contentMapper.selectByGroupModule(student.getGroupId(), 1L);
+            }
+        }
+        if (cover != null)
+        {
+            cover.setContent(coverHtml);
+            cover.setStatus(2L);
+            cover.setProgress(100L);
+            cover.setWordCount(words);
+            cover.setItemCount(countLines(stripHtml(coverHtml)));
+            cover.setVersion(cover.getVersion() == null ? 0L : cover.getVersion());
+            cover.setUpdateBy(operator);
+            if (contentMapper.updateWithVersion(cover) == 0)
+            {
+                throw new ServiceException("封面内容正被其他组员更新，请稍后重试");
+            }
+        }
+
+        // 小组置为已提交总稿并记录提交时间
+        TeGroup update = new TeGroup();
+        update.setId(student.getGroupId());
+        update.setSubmitStatus(1L);
+        update.setSubmitTime(new java.util.Date());
+        update.setUpdateTime(new java.util.Date());
+        groupMapper.updateTeGroup(update);
+
+        // 组长本人分工自动确认（预检只查组员，组长在此闭环）
+        TeStudent leaderUpdate = new TeStudent();
+        leaderUpdate.setUserId(userId);
+        leaderUpdate.setDutyStatus(1L);
+        leaderUpdate.setUpdateTime(new java.util.Date());
+        studentMapper.updateTeStudent(leaderUpdate);
+    }
+
+    /**
+     * ============================================================================
+     * 【功能】总稿PDF导出（阶段5 系统引擎）
+     * ----------------------------------------------------------------------------
+     * 【说明】仅已提交总稿的小组可下载。文档结构：封面页 → 目录页（10模块）→
+     *         各模块正文（分页起始）。采用 openhtmltopdf 渲染HTML生成PDF，
+     *         运行时从 Windows 字体目录探测中文字体（等线/黑体/仿宋/楷体），
+     *         @page 页脚自动输出"第 x 页 / 共 y 页"。
+     * ============================================================================
+     */
+    @Override
+    public byte[] exportFinalPdf(Long userId)
+    {
+        TeStudent student = getStudentChecked(userId);
+        if (student.getGroupId() == null)
+        {
+            throw new ServiceException("你尚未分组，暂无总稿可导出");
+        }
+        TeGroup group = groupMapper.selectById(student.getGroupId());
+        if (group == null || group.getSubmitStatus() == null || group.getSubmitStatus() != 1L)
+        {
+            throw new ServiceException("本组尚未提交总稿，提交成功后才能导出PDF");
+        }
+
+        // 组装10模块正文：优先取落库内容；"任务要求"（模块2）无落库时自动合成
+        List<Map<String, Object>> board = contentMapper.selectModuleBoard(student.getClassId(), student.getGroupId());
+        StringBuilder bodySb = new StringBuilder();
+        int seq = 0;
+        for (Map<String, Object> item : board)
+        {
+            Long code = toLong(item.get("moduleCode"));
+            TeModuleContent content = contentMapper.selectByGroupModule(student.getGroupId(), code);
+            String html = content == null ? "" : (content.getContent() == null ? "" : content.getContent());
+            if (isBlank(html) && code == 2L)
+            {
+                html = buildTaskRequirementHtml(student.getClassId(), student.getGroupId());
+            }
+            if (isBlank(html))
+            {
+                html = "<p style=\"color:#86909c\">（本模块内容暂缺）</p>";
+            }
+            seq++;
+            bodySb.append("<div class=\"module\">")
+                  .append("<h1 class=\"module-title\">").append(seq).append(". ")
+                  .append(escape(String.valueOf(item.get("moduleName")))).append("</h1>")
+                  .append(html)
+                  .append("</div>");
+        }
+
+        // 目录页：模块序号 + 模块名（页码简化为模块序号展示）
+        StringBuilder tocSb = new StringBuilder();
+        int tocSeq = 0;
+        for (Map<String, Object> item : board)
+        {
+            tocSeq++;
+            tocSb.append("<li><span class=\"toc-name\">").append(escape(String.valueOf(item.get("moduleName"))))
+                 .append("</span><span class=\"toc-num\">").append(tocSeq + 2).append("</span></li>"); // 封面+目录占2页
+        }
+
+        // 探测中文字体（单文件TTF，避免TTC兼容问题）：等线→黑体→仿宋→楷体
+        java.io.File fontFile = findChineseFont();
+        if (fontFile == null)
+        {
+            throw new ServiceException("服务器未找到可用中文字体（Deng/simhei/simfang/simkai.ttf），无法生成PDF");
+        }
+
+        // 完整HTML文档（封面复用 buildCoverHtml，保证页面展示与PDF一致）
+        StringBuilder doc = new StringBuilder();
+        doc.append("<html><head><meta charset=\"UTF-8\"/><style>")
+           .append("@page { size: A4; margin: 2.2cm 2cm;")
+           .append(" @bottom-center { content: \"第 \" counter(page) \" 页 / 共 \" counter(pages) \" 页\";")
+           .append("   font-size: 9px; color: #888; font-family: \"zh-font\"; } }")
+           .append("body { font-family: \"zh-font\"; font-size: 12px; color: #333; line-height: 1.7; }")
+           .append(".cover-page { page-break-after: always; padding-top: 150px; }")
+           .append(".toc-page { page-break-after: always; }")
+           .append(".toc-page li { list-style: none; font-size: 13px; padding: 7px 4px; border-bottom: 1px dashed #ddd; overflow: hidden; }")
+           .append(".toc-name { float: left; }")
+           .append(".toc-num { float: right; }")
+           .append(".module { page-break-before: always; }")
+           .append(".module-title { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 14px; }")
+           .append("table { border-collapse: collapse; } td, th { border: 1px solid #999; padding: 4px 8px; }")
+           .append("img { max-width: 100%; }")
+           .append("</style></head><body>")
+           // 封面页（系统生成）
+           .append("<div class=\"cover-page\">").append(buildCoverHtml(student)).append("</div>")
+           // 目录页
+           .append("<div class=\"toc-page\"><h2 style=\"text-align:center;\">目　录</h2><ul style=\"padding:0;margin:0;\">")
+           .append(tocSb)
+           .append("</ul></div>")
+           // 各模块正文
+           .append(bodySb)
+           .append("</body></html>");
+
+        // 渲染PDF返回字节流（响应头与写出由控制器处理）
+        try
+        {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            com.openhtmltopdf.pdfboxout.PdfRendererBuilder builder =
+                    new com.openhtmltopdf.pdfboxout.PdfRendererBuilder();
+            builder.useFastMode();
+            builder.useFont(fontFile, "zh-font");
+            builder.withHtmlContent(doc.toString(), null);
+            builder.toStream(out);
+            builder.run();
+            return out.toByteArray();
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("总稿PDF生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 探测Windows中文字体文件（返回第一个存在的单文件TTF，避免TTC集合兼容问题）
+     * 探测顺序：等线 Deng.ttf → 黑体 simhei.ttf → 仿宋 simfang.ttf → 楷体 simkai.ttf
+     */
+    private java.io.File findChineseFont()
+    {
+        String[] candidates = { "Deng.ttf", "simhei.ttf", "simfang.ttf", "simkai.ttf" };
+        for (String name : candidates)
+        {
+            java.io.File f = new java.io.File("C:\\Windows\\Fonts\\" + name);
+            if (f.exists() && f.isFile())
+            {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------
     // 私有工具方法
     // ------------------------------------------------------------------
 
@@ -633,15 +999,7 @@ public class TeStudentPortalServiceImpl implements ITeStudentPortalService
     private String buildTaskRequirementHtml(Long classId, Long groupId)
     {
         // 找到本组被分配的任务
-        TeTask task = null;
-        for (TeTaskAssign assign : taskAssignMapper.selectByClassId(classId))
-        {
-            if (groupId.equals(assign.getGroupId()))
-            {
-                task = taskMapper.selectTeTaskById(assign.getTaskId());
-                break;
-            }
-        }
+        TeTask task = findGroupTask(classId, groupId);
         if (task == null)
         {
             return "<p style=\"color:#86909c\">教师尚未给本组分配任务，请联系教师。</p>";
@@ -655,6 +1013,103 @@ public class TeStudentPortalServiceImpl implements ITeStudentPortalService
         appendSection(sb, "评分标准", task.getGradingStandard());
         appendSection(sb, "重要提示", task.getTips());
         return sb.toString();
+    }
+
+    /**
+     * 查找本组被分配的任务（任务分配表过滤本组 → 取任务详情）
+     */
+    private TeTask findGroupTask(Long classId, Long groupId)
+    {
+        for (TeTaskAssign assign : taskAssignMapper.selectByClassId(classId))
+        {
+            if (groupId.equals(assign.getGroupId()))
+            {
+                return taskMapper.selectTeTaskById(assign.getTaskId());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * ============================================================================
+     * 【功能】封面自动合成（阶段5 系统引擎）
+     * ----------------------------------------------------------------------------
+     * 【说明】按"系统生成封面"规范拼装只读HTML：平台名 + 课程名 + 任务题目 +
+     *         班级/小组 + 组成员表（姓名/学号/角色）+ 指导教师 + 日期。
+     *         使用内联样式，学生端富文本展示与总稿PDF渲染共用同一份内容。
+     * ============================================================================
+     */
+    private String buildCoverHtml(TeStudent student)
+    {
+        // 组员列表（封面成员表数据源）
+        TeStudent query = new TeStudent();
+        query.setGroupId(student.getGroupId());
+        List<TeStudent> members = studentMapper.selectTeStudentList(query);
+
+        // 本组任务题目（未分配任务时留空占位）
+        TeTask task = student.getClassId() == null ? null : findGroupTask(student.getClassId(), student.getGroupId());
+        String taskLine = task == null ? "（教师尚未分配任务）"
+                : "任务 " + escape(task.getTaskCode()) + "：" + escape(task.getTaskName());
+
+        // 组成员表行（姓名/学号/组内角色）
+        StringBuilder memberRows = new StringBuilder();
+        for (TeStudent mate : members)
+        {
+            memberRows.append("<tr>")
+                    .append("<td>").append(escape(mate.getNickName())).append("</td>")
+                    .append("<td>").append(escape(mate.getStudentNo())).append("</td>")
+                    .append("<td>").append(roleText(mate.getRoleType())).append("</td>")
+                    .append("</tr>");
+        }
+
+        // 指导教师（班级未分配时留空）
+        String teacherName = student.getClassId() == null ? ""
+                : studentMapper.selectTeacherNameByClassId(student.getClassId());
+
+        // 拼装封面（内联样式，居中排版）
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div style=\"text-align:center;padding:24px 8px;\">")
+          .append("<h1 style=\"font-size:30px;letter-spacing:8px;margin:16px 0 8px;\">智能教学平台</h1>")
+          .append("<h2 style=\"font-size:22px;margin:8px 0 24px;\">《汽车理论》课程设计报告</h2>")
+          .append("<p style=\"font-size:16px;margin:8px 0;\"><b>").append(taskLine).append("</b></p>")
+          .append("<p style=\"font-size:14px;color:#4e5969;margin:4px 0;\">班级：")
+          .append(escape(student.getClassName() == null ? "" : student.getClassName()))
+          .append("　　小组：").append(escape(student.getGroupName() == null ? "" : student.getGroupName()))
+          .append("</p>")
+          .append("<table style=\"border-collapse:collapse;margin:20px auto;min-width:360px;\">")
+          .append("<tr>")
+          .append("<th style=\"border:1px solid #dcdfe6;padding:6px 18px;background:#f5f7fa;\">姓名</th>")
+          .append("<th style=\"border:1px solid #dcdfe6;padding:6px 18px;background:#f5f7fa;\">学号</th>")
+          .append("<th style=\"border:1px solid #dcdfe6;padding:6px 18px;background:#f5f7fa;\">组内角色</th>")
+          .append("</tr>")
+          .append(memberRows)
+          .append("</table>")
+          .append("<p style=\"font-size:14px;margin:6px 0;\">指导教师：")
+          .append(escape(teacherName == null || teacherName.isEmpty() ? "　" : teacherName))
+          .append("</p>")
+          .append("<p style=\"font-size:14px;margin:6px 0;\">日期：")
+          .append(new java.text.SimpleDateFormat("yyyy年MM月dd日").format(new java.util.Date()))
+          .append("</p>")
+          .append("</div>");
+        return sb.toString();
+    }
+
+    /**
+     * 组内角色编码转文本（封面成员表展示用）
+     */
+    private String roleText(Long roleType)
+    {
+        if (roleType == null)
+        {
+            return "成员";
+        }
+        switch (roleType.intValue())
+        {
+            case 1: return "组长";
+            case 2: return "汇报人";
+            case 3: return "组长兼汇报人";
+            default: return "成员";
+        }
     }
 
     /**

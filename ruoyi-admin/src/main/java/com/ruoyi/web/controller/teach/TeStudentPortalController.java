@@ -162,4 +162,47 @@ public class TeStudentPortalController extends BaseController
         portalService.confirmDuty(getUserId(), memberUserId);
         return success();
     }
+
+    /**
+     * 总稿合规预检（阶段5）：4项检查结果（组长身份/模块完成/分工确认/贡献率）
+     */
+    @PreAuthorize("@ss.hasRole('student')")
+    @GetMapping("/submitPrecheck")
+    public AjaxResult submitPrecheck()
+    {
+        return success(portalService.submitPrecheck(getUserId()));
+    }
+
+    /**
+     * 提交总稿（阶段5）：预检全过后封面落库锁定 + 小组置已提交
+     */
+    @PreAuthorize("@ss.hasRole('student')")
+    @Log(title = "学生门户-总稿提交", businessType = BusinessType.UPDATE)
+    @PostMapping("/submitFinal")
+    public AjaxResult submitFinal()
+    {
+        portalService.submitFinal(getUserId());
+        return success("总稿提交成功");
+    }
+
+    /**
+     * 导出总稿PDF（阶段5）：封面+目录+10模块正文，仅已提交总稿可下载。
+     * Service 生成PDF字节流，本方法负责文件名与响应写出
+     */
+    @PreAuthorize("@ss.hasRole('student')")
+    @Log(title = "学生门户-总稿PDF导出", businessType = BusinessType.EXPORT)
+    @GetMapping("/exportPdf")
+    public void exportPdf(jakarta.servlet.http.HttpServletResponse response) throws Exception
+    {
+        byte[] pdf = portalService.exportFinalPdf(getUserId());
+        // 文件名含组名（从我的信息聚合中获取），URL编码防中文乱码
+        Object groupName = portalService.myInfo(getUserId()).get("groupName");
+        String fileName = java.net.URLEncoder.encode(
+                (groupName == null ? "小组" : groupName.toString()) + "-课程设计总稿.pdf", "UTF-8");
+        response.reset();
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + fileName);
+        response.getOutputStream().write(pdf);
+        response.getOutputStream().flush();
+    }
 }

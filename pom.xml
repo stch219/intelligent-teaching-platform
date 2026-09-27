@@ -177,6 +177,13 @@
                 <version>${ruoyi.version}</version>
             </dependency>
 
+            <!-- HTML转PDF渲染引擎（阶段5：总稿PDF导出，内嵌PDFBox，无需外部程序） -->
+            <dependency>
+                <groupId>com.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-pdfbox</artifactId>
+                <version>1.0.10</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 

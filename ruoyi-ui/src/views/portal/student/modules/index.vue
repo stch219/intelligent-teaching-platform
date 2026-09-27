@@ -10,6 +10,18 @@
                 + 乐观锁版本号防组员覆盖（冲突时提示刷新）
        ============================================================================ -->
   <div class="page">
+    <!-- 总稿中心操作条（阶段5）：合规预检 / 提交总稿 / 导出PDF -->
+    <div class="final-bar">
+      <div class="final-title">
+        总稿中心
+        <span class="final-tip">全部模块提交并确认后，由组长发起总稿提交（系统自动生成封面）</span>
+      </div>
+      <div>
+        <el-button type="primary" plain icon="CircleCheck" @click="openPrecheck">合规预检</el-button>
+        <el-button type="success" plain icon="Download" :loading="exporting" @click="doExportPdf">导出总稿PDF</el-button>
+      </div>
+    </div>
+
     <el-row :gutter="16">
       <!-- 左侧模块列表 -->
       <el-col :span="7">
@@ -64,15 +76,39 @@
         <el-empty v-else description="教师尚未设置模块，请等待教师配置" :image-size="100" />
       </el-col>
     </el-row>
+
+    <!-- 总稿合规预检对话框（阶段5）：4项检查结果 + 一键提交 -->
+    <el-dialog v-model="precheckVisible" title="总稿合规预检" width="580px" append-to-body>
+      <el-alert v-if="allPassed" type="success" :closable="false" show-icon
+                title="全部检查通过，可以提交总稿" />
+      <el-alert v-else type="warning" :closable="false" show-icon
+                title="存在未通过项，请按下方提示完善后再提交" />
+      <div class="check-item" v-for="c in checks" :key="c.code">
+        <el-icon :size="20" :color="c.passed ? '#67c23a' : '#f56c6c'">
+          <component :is="c.passed ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
+        </el-icon>
+        <div class="check-body">
+          <div class="check-name">{{ c.item }}</div>
+          <div class="check-detail">{{ c.detail }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="precheckVisible = false">关 闭</el-button>
+        <el-button type="primary" :disabled="!allPassed" :loading="submittingFinal" @click="doSubmitFinal">
+          确认提交总稿
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="StudentModules">
 // ============================================================================
 // 【功能】模块协同编辑逻辑：看板加载/切换 + 富文本读写 + 暂存/提交 +
-//        字数统计 + 乐观锁版本冲突处理 + URL参数直达指定模块
+//        字数统计 + 乐观锁版本冲突处理 + URL参数直达指定模块 +
+//        总稿中心（阶段5）：合规预检 / 提交总稿 / 导出总稿PDF
 // ============================================================================
-import { listModules, getModule, saveModule, submitModule } from '@/api/teach/studentPortal'
+import { listModules, getModule, saveModule, submitModule, getSubmitPrecheck, submitFinal, exportPdf } from '@/api/teach/studentPortal'
 
 const { proxy } = getCurrentInstance()
 const route = useRoute()
@@ -87,6 +123,60 @@ const content = ref('')
 const version = ref(0)
 const saving = ref(false)
 const submitting = ref(false)
+
+// ---------------- 总稿中心（阶段5） ----------------
+// 预检对话框可见性
+const precheckVisible = ref(false)
+// 预检结果（4项检查：code/item/passed/detail）
+const checks = ref([])
+// 是否全部通过（全过才允许提交总稿）
+const allPassed = computed(() => checks.value.length > 0 && checks.value.every(c => c.passed))
+// 提交总稿 / 导出PDF 的加载态
+const submittingFinal = ref(false)
+const exporting = ref(false)
+
+/** 打开预检对话框：拉取4项检查结果 */
+async function openPrecheck() {
+  const res = await getSubmitPrecheck()
+  checks.value = res.data || []
+  precheckVisible.value = true
+}
+
+/** 确认提交总稿（封面落库锁定 + 小组置已提交） */
+async function doSubmitFinal() {
+  await proxy.$modal.confirm('提交后全组报告将锁定，仅可导出PDF，确定提交总稿？')
+  submittingFinal.value = true
+  try {
+    await submitFinal()
+    proxy.$modal.msgSuccess('总稿提交成功，系统已自动生成封面')
+    precheckVisible.value = false
+    await load()
+  } finally {
+    submittingFinal.value = false
+  }
+}
+
+/** 导出总稿PDF（blob 下载；后端业务异常返回 JSON Blob，解析后提示） */
+async function doExportPdf() {
+  exporting.value = true
+  try {
+    const res = await exportPdf()
+    if (res && res.type === 'application/json') {
+      const data = JSON.parse(await res.text())
+      proxy.$modal.msgError(data.msg || '导出失败')
+      return
+    }
+    const url = window.URL.createObjectURL(new Blob([res], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '课程设计总稿.pdf'
+    link.click()
+    window.URL.revokeObjectURL(url)
+    proxy.$modal.msgSuccess('总稿PDF已导出')
+  } finally {
+    exporting.value = false
+  }
+}
 
 // 当前模块是否只读（editable=0）或已提交（status=2）
 const isReadonly = computed(() => currentRow.value && Number(currentRow.value.editable) === 0)
@@ -178,6 +268,24 @@ load()
 /* ==================== 模块编辑页样式 ==================== */
 .list-card, .edit-card { border-radius: 10px; }
 .card-title { font-weight: 600; color: #1d2b3a; }
+
+/* 总稿中心操作条（阶段5） */
+.final-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #fff; border: 1px solid #ebeef5; border-radius: 10px;
+  padding: 10px 16px; margin-bottom: 14px;
+  .final-title { font-weight: 600; color: #1d2b3a; }
+  .final-tip { margin-left: 10px; font-size: 12px; font-weight: 400; color: #86909c; }
+}
+
+/* 预检对话框检查项 */
+.check-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 4px; border-bottom: 1px dashed #ebeef5; margin-top: 6px;
+  .check-body { flex: 1; }
+  .check-name { font-size: 14px; font-weight: 600; color: #1d2b3a; }
+  .check-detail { font-size: 12px; color: #86909c; margin-top: 2px; }
+}
 
 /* 左侧模块单元（选中高亮） */
 .module-item {

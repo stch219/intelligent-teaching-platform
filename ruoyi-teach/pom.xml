@@ -29,6 +29,12 @@
             <artifactId>ruoyi-system</artifactId>
         </dependency>
 
+        <!-- HTML转PDF渲染引擎（阶段5：总稿PDF导出） -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

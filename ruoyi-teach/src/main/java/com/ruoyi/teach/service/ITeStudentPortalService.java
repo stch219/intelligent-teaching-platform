@@ -108,4 +108,30 @@ public interface ITeStudentPortalService
      * @param memberUserId 组员用户ID
      */
     public void confirmDuty(Long leaderUserId, Long memberUserId);
+
+    /**
+     * 总稿合规预检（阶段5）：组长身份 / 模块全部提交 / 全员分工确认 /
+     * 贡献率分配与全员确认，共4项检查
+     *
+     * @param userId 当前学生用户ID（须为组长）
+     * @return 检查结果集合（每项含 code/item/passed/detail）
+     */
+    public List<Map<String, Object>> submitPrecheck(Long userId);
+
+    /**
+     * 提交总稿（阶段5）：预检全过后，系统生成封面写入模块1并锁定，
+     * 小组置为"已提交总稿"状态并记录提交时间，组长分工自动确认
+     *
+     * @param userId 当前学生用户ID（须为组长）
+     */
+    public void submitFinal(Long userId);
+
+    /**
+     * 生成总稿PDF（阶段5）：封面页 + 目录页 + 10模块正文，中文字体渲染，
+     * 仅本组已提交总稿后允许导出
+     *
+     * @param userId 当前学生用户ID
+     * @return PDF 文件字节流（响应头与写出由控制器处理）
+     */
+    public byte[] exportFinalPdf(Long userId);
 }
