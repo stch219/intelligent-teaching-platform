@@ -91,7 +91,11 @@ export const constantRoutes = [
       { path: 'module', component: () => import('@/views/portal/teacher/module/index'), name: 'TeacherModule', meta: { title: '模块设置', icon: 'form' } },
       { path: 'material', component: () => import('@/views/portal/teacher/material/index'), name: 'TeacherMaterial', meta: { title: '资料发布', icon: 'documentation' } },
       { path: 'warning', component: () => import('@/views/portal/teacher/warning/index'), name: 'TeacherWarning', meta: { title: '预警规则', icon: 'bell' } },
-      { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分', icon: 'money' } }
+      { path: 'score', component: () => import('@/views/portal/teacher/score/index'), name: 'TeacherScore', meta: { title: '模块赋分', icon: 'money' } },
+      // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
+      { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'TeacherMessage', meta: { title: '消息中心', icon: 'message' } },
+      { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'TeacherTopic', meta: { title: '模块讨论', icon: 'chat' } },
+      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'TeacherNotice', meta: { title: '班级公告', icon: 'documentation' } }
     ]
   },
   {
@@ -107,7 +111,11 @@ export const constantRoutes = [
       { path: 'profile', component: () => import('@/views/portal/student/profile/index'), name: 'StudentProfile', meta: { title: '个人中心', icon: 'user' } },
       { path: 'board', component: () => import('@/views/portal/student/board/index'), name: 'StudentBoard', meta: { title: '公示板', icon: 'clipboard' } },
       { path: 'modules', component: () => import('@/views/portal/student/modules/index'), name: 'StudentModules', meta: { title: '模块编辑', icon: 'form' } },
-      { path: 'contribution', component: () => import('@/views/portal/student/contribution/index'), name: 'StudentContribution', meta: { title: '贡献率', icon: 'chart' } }
+      { path: 'contribution', component: () => import('@/views/portal/student/contribution/index'), name: 'StudentContribution', meta: { title: '贡献率', icon: 'chart' } },
+      // 【阶段6消息系统】师生共用面板：消息中心/模块讨论/班级公告
+      { path: 'message', component: () => import('@/views/portal/common/ChatPanel'), name: 'StudentMessage', meta: { title: '消息中心', icon: 'message' } },
+      { path: 'topic', component: () => import('@/views/portal/common/TopicPanel'), name: 'StudentTopic', meta: { title: '模块讨论', icon: 'chat' } },
+      { path: 'notice', component: () => import('@/views/portal/common/NoticePanel'), name: 'StudentNotice', meta: { title: '班级公告', icon: 'documentation' } }
     ]
   },
   {

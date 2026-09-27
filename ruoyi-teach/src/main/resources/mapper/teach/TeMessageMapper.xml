@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     聊天消息 Mapper XML（表 te_message）— 阶段6消息系统
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeMessageMapper">
+
+    <!-- 结果映射：消息基础字段（含联查发送人姓名） -->
+    <resultMap type="TeMessage" id="TeMessageResult">
+        <id     property="id"         column="id"/>
+        <result property="chatId"     column="chat_id"/>
+        <result property="senderId"   column="sender_id"/>
+        <result property="msgType"    column="msg_type"/>
+        <result property="content"    column="content"/>
+        <result property="sendTime"   column="send_time"/>
+        <result property="senderName" column="sender_name"/>
+    </resultMap>
+
+    <!-- 新增消息（useGeneratedKeys 回填自增ID，供WebSocket推送与已读回执使用） -->
+    <insert id="insertTeMessage" parameterType="TeMessage" useGeneratedKeys="true" keyProperty="id">
+        insert into te_message (chat_id, sender_id, msg_type, content, send_time)
+        values (#{chatId}, #{senderId}, #{msgType}, #{content}, #{sendTime})
+    </insert>
+
+    <!-- 按会话查询历史消息：最新 limit 条（ID倒序取，服务层反转为时间正序展示） -->
+    <select id="selectByChatId" resultMap="TeMessageResult">
+        select m.id, m.chat_id, m.sender_id, m.msg_type, m.content, m.send_time,
+               u.nick_name as sender_name
+        from te_message m
+        left join sys_user u on u.user_id = m.sender_id
+        where m.chat_id = #{chatId}
+        order by m.id desc
+        limit #{limit}
+    </select>
+
+    <!-- 查询会话最后一条消息（会话列表预览） -->
+    <select id="selectLastByChatId" parameterType="Long" resultMap="TeMessageResult">
+        select m.id, m.chat_id, m.sender_id, m.msg_type, m.content, m.send_time,
+               u.nick_name as sender_name
+        from te_message m
+        left join sys_user u on u.user_id = m.sender_id
+        where m.chat_id = #{chatId}
+        order by m.id desc
+        limit 1
+    </select>
+
+</mapper>

@@ -36,6 +36,12 @@
             <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
+        <!-- 【阶段6消息系统】WebSocket支持：提供@ServerEndpoint服务端能力与内嵌容器的WS端点导出 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- 核心模块-->
         <dependency>
             <groupId>com.ruoyi</groupId>

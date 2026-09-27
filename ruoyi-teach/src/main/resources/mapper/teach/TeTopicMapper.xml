@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     模块讨论话题 Mapper XML（表 te_topic）— 阶段6消息系统
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeTopicMapper">
+
+    <!-- 结果映射：话题基础字段（含联查发起人/组名/回复数） -->
+    <resultMap type="TeTopic" id="TeTopicResult">
+        <id     property="id"          column="id"/>
+        <result property="groupId"     column="group_id"/>
+        <result property="moduleCode"  column="module_code"/>
+        <result property="title"       column="title"/>
+        <result property="creatorId"   column="creator_id"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="creatorName" column="creator_name"/>
+        <result property="groupName"   column="group_name"/>
+        <result property="replyCount"  column="reply_count"/>
+    </resultMap>
+
+    <!-- 查询话题列表：
+         学生：按 groupId 过滤（本组话题）
+         教师：按 classId 过滤（本班全部小组话题，子查询组集合） -->
+    <select id="selectTeTopicList" parameterType="TeTopic" resultMap="TeTopicResult">
+        select t.id, t.group_id, t.module_code, t.title, t.creator_id,
+               t.create_time, t.update_time,
+               u.nick_name  as creator_name,
+               g.group_name as group_name,
+               (select count(*) from te_topic_reply r where r.topic_id = t.id) as reply_count
+        from te_topic t
+        left join sys_user u on u.user_id = t.creator_id
+        left join te_group g on g.id = t.group_id
+        <where>
+            <if test="groupId != null"> and t.group_id = #{groupId}</if>
+            <if test="classId != null"> and t.group_id in (select id from te_group where class_id = #{classId})</if>
+            <if test="moduleCode != null"> and t.module_code = #{moduleCode}</if>
+        </where>
+        order by coalesce(t.update_time, t.create_time) desc
+    </select>
+
+    <!-- 按ID查询话题 -->
+    <select id="selectTeTopicById" parameterType="Long" resultMap="TeTopicResult">
+        select t.id, t.group_id, t.module_code, t.title, t.creator_id,
+               t.create_time, t.update_time,
+               u.nick_name  as creator_name,
+               g.group_name as group_name,
+               (select count(*) from te_topic_reply r where r.topic_id = t.id) as reply_count
+        from te_topic t
+        left join sys_user u on u.user_id = t.creator_id
+        left join te_group g on g.id = t.group_id
+        where t.id = #{id}
+    </select>
+
+    <!-- 新增话题 -->
+    <insert id="insertTeTopic" parameterType="TeTopic" useGeneratedKeys="true" keyProperty="id">
+        insert into te_topic (group_id, module_code, title, creator_id, create_time, update_time)
+        values (#{groupId}, #{moduleCode}, #{title}, #{creatorId}, #{createTime}, #{updateTime})
+    </insert>
+
+    <!-- 刷新话题最后回复时间（新回复落库后调用，用于话题排序） -->
+    <update id="updateTopicTime" parameterType="Long">
+        update te_topic set update_time = sysdate() where id = #{id}
+    </update>
+
+</mapper>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     话题回复 Mapper XML（表 te_topic_reply）— 阶段6消息系统
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeTopicReplyMapper">
+
+    <!-- 结果映射：回复基础字段（含联查回复人/被回复人姓名） -->
+    <resultMap type="TeTopicReply" id="TeTopicReplyResult">
+        <id     property="id"          column="id"/>
+        <result property="topicId"     column="topic_id"/>
+        <result property="replyId"     column="reply_id"/>
+        <result property="userId"      column="user_id"/>
+        <result property="content"     column="content"/>
+        <result property="replyTime"   column="reply_time"/>
+        <result property="nickName"    column="nick_name"/>
+        <result property="replyToName" column="reply_to_name"/>
+    </resultMap>
+
+    <!-- 查询话题下全部回复（时间正序；中楼联查父回复作者姓名） -->
+    <select id="selectByTopicId" parameterType="Long" resultMap="TeTopicReplyResult">
+        select r.id, r.topic_id, r.reply_id, r.user_id, r.content, r.reply_time,
+               u.nick_name  as nick_name,
+               ru.nick_name as reply_to_name
+        from te_topic_reply r
+        left join sys_user u on u.user_id = r.user_id
+        left join te_topic_reply pr on pr.id = r.reply_id
+        left join sys_user ru on ru.user_id = pr.user_id
+        where r.topic_id = #{topicId}
+        order by r.id asc
+    </select>
+
+    <!-- 新增回复 -->
+    <insert id="insertTeTopicReply" parameterType="TeTopicReply" useGeneratedKeys="true" keyProperty="id">
+        insert into te_topic_reply (topic_id, reply_id, user_id, content, reply_time)
+        values (#{topicId}, #{replyId}, #{userId}, #{content}, #{replyTime})
+    </insert>
+
+</mapper>

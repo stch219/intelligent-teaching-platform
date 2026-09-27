@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     会话成员 Mapper XML（表 te_chat_member）— 阶段6消息系统
+     last_read_msg_id 为已读/未读回执核心字段
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeChatMemberMapper">
+
+    <!-- 结果映射：成员基础字段 -->
+    <resultMap type="TeChatMember" id="TeChatMemberResult">
+        <id     property="id"            column="id"/>
+        <result property="chatId"        column="chat_id"/>
+        <result property="userId"        column="user_id"/>
+        <result property="lastReadMsgId" column="last_read_msg_id"/>
+        <result property="joinTime"      column="join_time"/>
+    </resultMap>
+
+    <!-- 查询会话内指定成员（发消息/看历史前的成员权限校验） -->
+    <select id="selectByChatAndUser" resultMap="TeChatMemberResult">
+        select id, chat_id, user_id, last_read_msg_id, join_time
+        from te_chat_member
+        where chat_id = #{param1} and user_id = #{param2}
+    </select>
+
+    <!-- 查询会话全部成员（WebSocket 消息推送目标） -->
+    <select id="selectByChatId" parameterType="Long" resultMap="TeChatMemberResult">
+        select id, chat_id, user_id, last_read_msg_id, join_time
+        from te_chat_member
+        where chat_id = #{chatId}
+    </select>
+
+    <!-- 新增单个成员（单聊建会话时逐个写入） -->
+    <insert id="insertTeChatMember" parameterType="TeChatMember" useGeneratedKeys="true" keyProperty="id">
+        insert into te_chat_member (chat_id, user_id, last_read_msg_id, join_time)
+        values (#{chatId}, #{userId}, 0, #{joinTime})
+    </insert>
+
+    <!-- 批量新增成员（群聊建会话时一次写入组员+指导教师） -->
+    <insert id="insertMembers" useGeneratedKeys="true" keyProperty="id">
+        insert into te_chat_member (chat_id, user_id, last_read_msg_id, join_time)
+        values
+        <foreach collection="list" item="m" separator=",">
+            (#{m.chatId}, #{m.userId}, 0, #{m.joinTime})
+        </foreach>
+    </insert>
+
+    <!-- 推进已读回执：last_read_msg_id 更新为该会话最新消息ID（进入会话即视为已读） -->
+    <update id="updateLastReadToLatest">
+        update te_chat_member me
+        set me.last_read_msg_id = (select coalesce(max(m.id), 0) from te_message m where m.chat_id = me.chat_id)
+        where me.chat_id = #{param1} and me.user_id = #{param2}
+    </update>
+
+    <!-- 统计我的全部会话未读消息总数（导航角标） -->
+    <select id="countMyUnread" parameterType="Long" resultType="int">
+        select count(*)
+        from te_message m
+        join te_chat_member me on me.chat_id = m.chat_id and me.user_id = #{userId}
+        where m.id > me.last_read_msg_id and m.sender_id != me.user_id
+    </select>
+
+</mapper>

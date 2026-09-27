@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     聊天会话 Mapper XML（表 te_chat）— 阶段6消息系统
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeChatMapper">
+
+    <!-- 结果映射：会话基础字段 -->
+    <resultMap type="TeChat" id="TeChatResult">
+        <id     property="id"         column="id"/>
+        <result property="chatType"   column="chat_type"/>
+        <result property="chatName"   column="chat_name"/>
+        <result property="groupId"    column="group_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <!-- 按ID查询会话 -->
+    <select id="selectTeChatById" parameterType="Long" resultMap="TeChatResult">
+        select id, chat_type, chat_name, group_id, create_time, update_time
+        from te_chat
+        where id = #{id}
+    </select>
+
+    <!-- 查询两用户之间的单聊会话（懒创建前查重：同一会话内同时存在这两个成员） -->
+    <select id="selectSingleChat" resultMap="TeChatResult">
+        select c.id, c.chat_type, c.chat_name, c.group_id, c.create_time, c.update_time
+        from te_chat c
+        join te_chat_member m1 on m1.chat_id = c.id and m1.user_id = #{param1}
+        join te_chat_member m2 on m2.chat_id = c.id and m2.user_id = #{param2}
+        where c.chat_type = 1
+        limit 1
+    </select>
+
+    <!-- 查询某小组的群聊会话（懒创建前查重） -->
+    <select id="selectGroupChat" parameterType="Long" resultMap="TeChatResult">
+        select id, chat_type, chat_name, group_id, create_time, update_time
+        from te_chat
+        where chat_type = 2 and group_id = #{groupId}
+        limit 1
+    </select>
+
+    <!-- 新增会话 -->
+    <insert id="insertTeChat" parameterType="TeChat" useGeneratedKeys="true" keyProperty="id">
+        insert into te_chat (chat_type, chat_name, group_id, create_time, update_time)
+        values (#{chatType}, #{chatName}, #{groupId}, #{createTime}, #{updateTime})
+    </insert>
+
+    <!-- 我的会话列表：展示名（单聊=对方昵称/群聊=组名）+ 未读数 + 最后一条消息预览，按最近消息时间倒序 -->
+    <select id="selectMyChatList" parameterType="Long" resultType="java.util.HashMap">
+        select c.id                                                            as chatId,
+               c.chat_type                                                     as chatType,
+               c.group_id                                                      as groupId,
+               case when c.chat_type = 2
+                    then coalesce(g.group_name, c.chat_name)
+                    else (select u.nick_name
+                          from te_chat_member om
+                          join sys_user u on u.user_id = om.user_id
+                          where om.chat_id = c.id and om.user_id != #{userId}
+                          limit 1)
+               end                                                             as displayName,
+               (select count(*) from te_message um
+                 where um.chat_id = c.id
+                   and um.id > me.last_read_msg_id
+                   and um.sender_id != #{userId})                              as unreadCount,
+               lm.content                                                      as lastContent,
+               lm.sender_id                                                    as lastSenderId,
+               lm.send_time                                                    as lastTime
+        from te_chat c
+        join te_chat_member me on me.chat_id = c.id and me.user_id = #{userId}
+        left join te_group g on g.id = c.group_id
+        left join te_message lm on lm.id = (select max(m2.id) from te_message m2 where m2.chat_id = c.id)
+        order by coalesce(lm.send_time, c.create_time) desc
+    </select>
+
+    <!-- 更新会话最后消息时间（新消息落库后调用，用于会话排序） -->
+    <update id="updateChatTime" parameterType="Long">
+        update te_chat set update_time = sysdate() where id = #{id}
+    </update>
+
+</mapper>

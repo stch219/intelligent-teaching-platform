@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     班级公告 Mapper XML（表 te_announcement）— 阶段6消息系统
+     ============================================================================ -->
+<mapper namespace="com.ruoyi.teach.mapper.TeAnnouncementMapper">
+
+    <!-- 结果映射：公告基础字段（含联查班级名称） -->
+    <resultMap type="TeAnnouncement" id="TeAnnouncementResult">
+        <id     property="id"          column="id"/>
+        <result property="title"       column="title"/>
+        <result property="content"     column="content"/>
+        <result property="classId"     column="class_id"/>
+        <result property="publishBy"   column="publish_by"/>
+        <result property="publishTime" column="publish_time"/>
+        <result property="className"   column="class_name"/>
+    </resultMap>
+
+    <!-- 查询公告列表（按班级过滤，时间倒序） -->
+    <select id="selectTeAnnouncementList" parameterType="TeAnnouncement" resultMap="TeAnnouncementResult">
+        select a.id, a.title, a.content, a.class_id, a.publish_by, a.publish_time,
+               c.class_name as class_name
+        from te_announcement a
+        left join te_class c on c.id = a.class_id
+        <where>
+            <if test="classId != null"> and a.class_id = #{classId}</if>
+            <if test="publishBy != null and publishBy != ''"> and a.publish_by = #{publishBy}</if>
+        </where>
+        order by a.publish_time desc
+    </select>
+
+    <!-- 按ID查询公告 -->
+    <select id="selectTeAnnouncementById" parameterType="Long" resultMap="TeAnnouncementResult">
+        select a.id, a.title, a.content, a.class_id, a.publish_by, a.publish_time,
+               c.class_name as class_name
+        from te_announcement a
+        left join te_class c on c.id = a.class_id
+        where a.id = #{id}
+    </select>
+
+    <!-- 新增公告 -->
+    <insert id="insertTeAnnouncement" parameterType="TeAnnouncement" useGeneratedKeys="true" keyProperty="id">
+        insert into te_announcement (title, content, class_id, publish_by, publish_time)
+        values (#{title}, #{content}, #{classId}, #{publishBy}, #{publishTime})
+    </insert>
+
+</mapper>

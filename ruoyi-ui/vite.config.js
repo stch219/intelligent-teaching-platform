@@ -52,6 +52,12 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/dev-api/, '')
         },
+        // 【阶段6消息系统】WebSocket代理：前端 ws://host/websocket/message → 后端8080
+        '/websocket': {
+          target: 'ws://localhost:8080',
+          ws: true,
+          changeOrigin: true
+        },
          // springdoc proxy
          '^/v3/api-docs/(.*)': {
           target: baseUrl,
