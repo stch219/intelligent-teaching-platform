@@ -80,6 +80,8 @@ intelligent-teaching-platform/
 ├── ai-server/          # ★ Python AI 微服务（FastAPI + llama.cpp 推理）
 ├── ruoyi-ui/           # Vue3 前端
 ├── sql/                # 数据库脚本（若依基线 + 业务表）
+├── scripts/            # ★ 接口回归测试脚本（api_regression_test.py）
+├── deploy/             # ★ 生产部署配置（nginx.conf）
 ├── docs/
 │   ├── requirements/   # 需求文档
 │   └── issues/         # 开发问题记录
@@ -110,7 +112,9 @@ mysql -u root -p < sql/ry_20260417.sql
 mysql -u root -p < sql/quartz.sql
 mysql -u root -p < sql/itp_business.sql
 mysql -u root -p < sql/itp_menu.sql   # 角色（教师/学生）与管理员端菜单
-# （仅老库升级时执行 sql/itp_phase7.sql 增量脚本：te_ai_review 补 teacher_score 列，新库已含可跳过）
+# （仅老库升级时执行增量脚本，新库已含可跳过）
+#   sql/itp_phase7.sql：te_ai_review 补 teacher_score 列
+#   sql/itp_phase8.sql：te_task 补 deadline 列、te_warning_record 补 resolved 列、帮助中心表 te_help
 
 # 2. 修改后端配置 ruoyi-admin/src/main/resources/application-druid.yml（数据库密码）
 #    及 application.yml（Redis 配置）
@@ -162,6 +166,34 @@ python ai_server.py    # 端口 8300；检测到本地模型目录即离线加�
 
 访问 http://localhost:80（前端开发端口见 vite 配置），默认管理员账号 `admin / admin123`。
 
+### 接口回归测试（阶段9）
+
+一键回归全部核心接口（可复跑，动态学号/临时班级自动清理，不污染固定测试数据）：
+
+```bash
+pip install requests                     # 仅需 Python 3.8+ 与 requests
+python scripts/api_regression_test.py    # 后端 8080 启动后执行
+```
+
+覆盖 43 条用例：三角色登录、未登录 401 / 学生越权 403 拦截、注册审批全闭环（提交→防重复→幽灵班级拦截→审批→新号登录）、管理员端查询、教师端（建班删除闭环/分组/任务/模块/赋分/预警规则与扫描/AI 批改/成绩/仪表盘）、学生端（信息/模块/贡献率/成绩/预警/消息/仪表盘）、帮助中心。结束输出每条 PASS/FAIL 与总通过率（当前基线 100%）。
+
+### 生产部署（阶段9）
+
+```bash
+# 1. 前端生产构建（产物在 ruoyi-ui/dist，js/css 文件名带 hash）
+cd ruoyi-ui
+npm run build:prod
+
+# 2. 后端生产打包（同快速开始第 3 步）并上传服务器
+mvn clean package -DskipTests
+
+# 3. Nginx 托管前端静态资源并反代后端（完整配置见 deploy/nginx.conf）
+#    - /            → 前端 dist 静态资源（history 路由 try_files 兜底）
+#    - /prod-api/   → 反代 http://localhost:8080/（剥离前缀）
+#    - /websocket/  → 反代 8080 并携带 Upgrade/Connection 升级头（实时消息）
+# 修改 nginx.conf 中的 root 为实际 dist 路径后 nginx -s reload 生效
+```
+
 ## 开发计划
 
 - [x] 阶段0：环境准备 + 仓库初始化 + 若依基线跑通
@@ -173,7 +205,7 @@ python ai_server.py    # 端口 8300；检测到本地模型目录即离线加�
 - [x] 阶段6：消息系统（WebSocket 实时单聊/组内群聊（token 握手认证·心跳保活·断线重连·同账号顶替） / 已读未读回执（进入会话即读·导航未读角标） / 可联系人发起单聊（学生=指导教师+组员·教师=本班学生） / 模块讨论话题（学生发起本组话题·教师查看本班并回复·楼中楼指向） / 班级公告（教师发布·归属校验·在线学生 WebSocket 实时提醒） / 师生共用消息中心/讨论/公告三大页面）
 - [x] 阶段7：AI 批改 + 成绩判分（本地多模态大模型批改（transformers + Qwen2.5-VL-3B·GPU/CPU 硬件自适应降级·引擎不可用规则兜底） / 三段式评语（亮点-问题-建议） / 教师核查核定终分 / 成绩判分汇总（模块得分=满分×生效分%·个人得分=模块得分×贡献率%） / 一键发布（重复发布自动撤回旧成绩） / 教师端 AI 批改工作台 / 学生端「我的成绩」分数卡+模块明细）——实测 RTX 5070 Ti 12GB 命中降级链第①级 bf16：4.3 秒/模块（CPU 约 2~5 分钟），6 模块 26 秒完成批改+落库+成绩折算全链路
 - [x] 阶段8：仪表盘、三级预警、帮助中心（三端仪表盘（管理员平台统计·教师 echarts 教学总览+一键扫描·学生五卡+预警横幅+ws 实时弹窗） / 三级预警扫描引擎（黄橙红规则命中取最高级·逾期未交硬红·幂等落库·WebSocket 推送在线组员·记录处置） / 任务截止时间设置（扫描判定基准） / 帮助中心（师生共用目录式指引+管理员富文本维护））
-- [ ] 阶段9：测试、文档终稿、发布
+- [x] 阶段9：测试、文档终稿、发布（接口回归测试（Python 脚本 43 条用例一键回归·动态数据可复跑·三角色越权安全用例·注册审批/AI 批改/预警扫描全业务闭环·当前基线 100% 通过） / 生产部署方案（npm run build:prod + deploy/nginx.conf 前端静态+API 反代+WebSocket 升级） / README 文档终稿）
 
 ## 文档
 
