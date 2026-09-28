@@ -82,9 +82,7 @@ intelligent-teaching-platform/
 ├── sql/                # 数据库脚本（若依基线 + 业务表）
 ├── scripts/            # ★ 接口回归测试脚本（api_regression_test.py）
 ├── deploy/             # ★ 生产部署配置（nginx.conf）
-├── docs/
-│   ├── requirements/   # 需求文档
-│   └── issues/         # 开发问题记录
+├── docs/               # 本地文档（需求资料/开发问题记录，不入库，见 .gitignore）
 ├── pom.xml             # Maven 父工程
 ├── LICENSE             # MIT License
 └── README.md
@@ -209,8 +207,7 @@ mvn clean package -DskipTests
 
 ## 文档
 
-- [需求文档](docs/requirements/)
-- [开发问题记录](docs/issues/开发问题记录.md)
+- 需求文档与开发问题记录存放于本地 `docs/` 目录（含课程原始需求资料，未纳入版本库）
 
 ## 许可证
 
