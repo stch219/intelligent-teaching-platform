@@ -9,6 +9,7 @@ import useUserStore from '@/store/modules/user'
 import useLockStore from '@/store/modules/lock'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
+import useTagsViewStore from '@/store/modules/tagsView'
 
 NProgress.configure({ showSpinner: false })
 
@@ -76,6 +77,10 @@ router.beforeEach(async (to, from) => {
       // 在免登录白名单，直接进入
       return true
     }
+    // 【跨账号缓存隔离】token 静默过期时这里是 Vue Router 软跳转（页面不刷新），
+    // pinia 与 KeepAlive 缓存都会原样保留；必须清空标签页与缓存组件实例，
+    // 防止换账号登录后复用上一账号的页面数据（如消息中心显示他人会话）
+    useTagsViewStore().delAllViews()
     NProgress.done()
     return `/login?redirect=${to.fullPath}` // 否则全部重定向到登录页
   }

@@ -5,6 +5,7 @@ import { login, logout, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { isHttp, isEmpty } from "@/utils/validate"
 import useLockStore from '@/store/modules/lock'
+import useTagsViewStore from '@/store/modules/tagsView'
 import defAva from '@/assets/images/profile.jpg'
 
 const useUserStore = defineStore(
@@ -30,6 +31,14 @@ const useUserStore = defineStore(
           login(username, password, code, uuid).then(res => {
             setToken(res.token)
             this.token = res.token
+            // 【跨账号状态隔离】token 静默过期后软跳登录页换账号登录时，上一账号的
+            // 身份状态（角色/昵称等）仍残留在本 store 中，守卫会因 roles 非空跳过
+            // getInfo 导致显示上一账号的用户信息；此处清空强制守卫重新拉取
+            this.roles = []
+            this.permissions = []
+            this.id = ''
+            this.name = ''
+            this.nickName = ''
             useLockStore().unlockScreen()
             resolve()
           }).catch(error => {
@@ -83,6 +92,10 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             removeToken()
+            // 【跨账号缓存隔离】退出时清空标签页与KeepAlive缓存（cachedViews置空会
+            // 销毁全部缓存组件实例），防止换账号登录后复用上一账号的组件数据
+            // （如消息中心残留上一账号的会话与聊天记录，造成越权展示）
+            useTagsViewStore().delAllViews()
             resolve()
           }).catch(error => {
             reject(error)

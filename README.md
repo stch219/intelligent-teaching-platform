@@ -310,6 +310,7 @@ mvn clean package -DskipTests
 - [x] 阶段9：测试、文档终稿、发布（接口回归测试（Python 脚本 43 条用例一键回归·动态数据可复跑·三角色越权安全用例·注册审批/AI 批改/预警扫描全业务闭环·当前基线 100% 通过） / 生产部署方案（npm run build:prod + deploy/nginx.conf 前端静态+API 反代+WebSocket 升级） / README 文档终稿）
 - [x] 阶段9.1：三端界面修复（管理员侧边栏按角色隔离（只保留本端菜单） / 修复菜单切换空白页（AppMain transition 与 KeepAlive 竞态） / README 补充 43 条测试用例清单与页面冒烟用例）
 - [x] 阶段9.2：AI 参考分口径修复（ai_score/teacher_score 统一为按模块满分折算的"模块得分"（≤满分），落库前折算+钳制，成绩汇总直接求和并加赋分变更越界校验；教师核定分输入上限动态取满分；存量数据迁移脚本 itp_fix9_ai_score.sql）
+- [x] 阶段9.3：跨账号前端状态隔离修复（token 静默过期软跳登录后 KeepAlive 缓存与 user store 残留上一账号数据，换账号登录消息中心显示他人会话；修复：退出/登录/无 token 软跳三处清空标签与缓存组件实例，登录时清空身份状态强制重新 getInfo）
 
 ## 文档
 
