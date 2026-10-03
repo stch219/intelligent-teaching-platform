@@ -76,7 +76,7 @@
     <el-dialog v-model="detailVisible" :title="`${activeRow.groupName} · 批改详情与终审`" width="880px" top="6vh">
       <div class="engine-line" v-if="detailRows.length">
         批改来源：<el-tag size="small">{{ detailRows[0].modelName || '-' }}</el-tag>
-        <span class="muted ml8">生效分 = 教师核定分（填写后），未填写时取 AI 参考分</span>
+        <span class="muted ml8">各分数均为按模块满分折算后的模块得分（不超过满分）；生效分 = 教师核定分（填写后），未填写时取 AI 参考分</span>
       </div>
       <el-table :data="detailRows" v-loading="detailLoading">
         <el-table-column label="模块" width="150">
@@ -90,8 +90,9 @@
         </el-table-column>
         <el-table-column label="教师核定分" width="150" align="center">
           <template #default="s">
-            <el-input-number v-model="s.row._teacherScore" :min="0" :max="100" :step="1" :precision="0"
-              controls-position="right" placeholder="不调整留空" style="width: 130px" />
+            <!-- 核定分与AI参考分同为"模块绝对分"口径，上限取该模块满分（取不到时兜底100） -->
+            <el-input-number v-model="s.row._teacherScore" :min="0" :max="s.row.moduleMax || 100" :step="1"
+              :precision="1" controls-position="right" placeholder="不调整留空" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column label="评语（优点 / 问题 / 建议）" min-width="300">

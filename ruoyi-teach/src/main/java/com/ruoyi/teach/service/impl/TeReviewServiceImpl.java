@@ -49,8 +49,12 @@ import com.ruoyi.teach.service.ITeReviewService;
  * ----------------------------------------------------------------------------
  * 【批改链路】组装模块内容 → 健康检查 Python 推理服务 → 多模态大模型批改 →
  *             服务不可用/解析失败时本地规则模拟兜底 → 落库 te_ai_review →
- *             回写小组AI参考分（Σ 模块满分×AI分/100）
- * 【判分公式】小组最终分 = Σ(各模块生效分)（生效分=教师核定分，缺省用AI参考分）
+ *             回写小组AI参考分（Σ 各模块AI参考分）
+ * 【分数口径】ai_score / teacher_score 均为"模块绝对分"：模型按百分制（0-100）
+ *             输出，落库前统一折算为 模块满分×百分制分/100（钳制≤模块满分），
+ *             保证界面展示与成绩计算全程同口径，杜绝"AI分>满分"的观感错乱
+ * 【判分公式】小组最终分 = Σ(各模块生效分)（生效分=教师核定分优先，缺省用AI参考分，
+ *             均为模块绝对分，直接求和）
  *             个人最终得分 = Σ(模块生效分 × 个人该模块贡献率)
  * 【规则模拟】按字数/结构/代码块/图片/条目五维度启发式打分，保证任何机器可用
  * ============================================================================
@@ -187,18 +191,26 @@ public class TeReviewServiceImpl implements ITeReviewService
                 comment = ruleComment(text);
             }
             BigDecimal max = maxMap.get(code);
+            // 模型/规则输出为百分制分（0-100），落库前统一折算为"模块绝对分"：
+            // 绝对分 = 模块满分 × 百分制分 / 100（保留1位四舍五入），并钳制不超过模块满分，
+            // 保证界面展示与后续判分全程同口径（AI参考分不可能大于模块满分）
+            BigDecimal absScore = max.multiply(BigDecimal.valueOf(score))
+                    .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
+            if (absScore.compareTo(max) > 0)
+            {
+                absScore = max;   // 防御性钳制：折算结果不得超过模块满分
+            }
             TeAiReview record = new TeAiReview();
             record.setGroupId(groupId);
             record.setModuleCode(code);
-            record.setAiScore(BigDecimal.valueOf(score));
+            record.setAiScore(absScore);
             record.setReviewProcess(comment);
             record.setModelName(byEngine ? modelName + " / " + ENGINE_TAG : "rule-sim(本地规则)");
             record.setTeacherChecked(0L);
             record.setReviewTime(now);
             records.add(record);
-            // AI 参考总分 = Σ(模块满分 × AI百分制分 / 100)
-            aiRefScore = aiRefScore.add(max.multiply(BigDecimal.valueOf(score))
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+            // AI 参考总分 = Σ 各模块AI参考分（已是绝对分，直接累加）
+            aiRefScore = aiRefScore.add(absScore);
         }
         aiReviewMapper.batchInsert(records);
 
@@ -327,7 +339,8 @@ public class TeReviewServiceImpl implements ITeReviewService
             }
             TeAiReview update = new TeAiReview();
             update.setId(ownedRec.getId());
-            // 教师核定分：空表示不调整（沿用AI参考分）；填了则限定在 0~100
+            // 教师核定分：空表示不调整（沿用AI参考分）；填了则钳制在 0~模块满分
+            // （核定分与AI参考分同为"模块绝对分"口径，不能超过该模块满分）
             if (form.getTeacherScore() == null)
             {
                 update.setTeacherScore(null);
@@ -335,7 +348,9 @@ public class TeReviewServiceImpl implements ITeReviewService
             else
             {
                 double ts = form.getTeacherScore().doubleValue();
-                update.setTeacherScore(BigDecimal.valueOf(Math.max(0, Math.min(100, ts))));
+                // 钳制上限取联查出的模块满分（取不到时兜底100防误拦）
+                double cap = ownedRec.getModuleMax() != null ? ownedRec.getModuleMax().doubleValue() : 100;
+                update.setTeacherScore(BigDecimal.valueOf(Math.max(0, Math.min(cap, ts))));
             }
             update.setTeacherChecked(1L);
             update.setCheckedBy(checkedBy);
@@ -363,8 +378,8 @@ public class TeReviewServiceImpl implements ITeReviewService
         {
             throw new ServiceException("请先完成 AI 批改（含全部计分模块），再进行成绩汇总");
         }
-        // 2. 生效分（百分制）折算为"模块得分" = 模块满分 × 生效分/100；
-        //    教师核定分优先，缺省用 AI 参考分；组最终分 = Σ模块得分（≤100）
+        // 2. 生效分（教师核定分优先，缺省用AI参考分）已是"模块绝对分"口径，直接求和；
+        //    组最终分 = Σ模块生效分（各模块≤各自满分，总分≤100 恒成立）
         Map<Long, BigDecimal> finalMap = new HashMap<>();
         BigDecimal groupScore = BigDecimal.ZERO;
         for (TeAiReview r : reviews)
@@ -374,12 +389,16 @@ public class TeReviewServiceImpl implements ITeReviewService
                 throw new ServiceException("模块「" + MODULE_NAMES[(int) Math.max(0, Math.min(MODULE_NAMES.length - 1, r.getModuleCode()))]
                         + "」当前未设置满分值，请先完成模块赋分再汇总成绩");
             }
-            BigDecimal percent = r.getTeacherScore() != null ? r.getTeacherScore() : r.getAiScore();
-            // 模块得分 = 满分 × 百分制生效分 / 100（保留2位中间精度）
-            BigDecimal moduleScore = r.getModuleMax().multiply(percent)
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            finalMap.put(r.getModuleCode(), moduleScore);
-            groupScore = groupScore.add(moduleScore);
+            BigDecimal effective = r.getTeacherScore() != null ? r.getTeacherScore() : r.getAiScore();
+            // 校验生效分不超过当前满分：若教师批改后调整过模块赋分，旧分数可能越界，
+            // 此时提示重新批改，避免用过期口径汇出错误成绩
+            if (effective.compareTo(r.getModuleMax()) > 0)
+            {
+                throw new ServiceException("模块「" + MODULE_NAMES[(int) Math.max(0, Math.min(MODULE_NAMES.length - 1, r.getModuleCode()))]
+                        + "」的生效分超过当前满分（模块赋分可能已调整），请重新发起 AI 批改后再汇总");
+            }
+            finalMap.put(r.getModuleCode(), effective);
+            groupScore = groupScore.add(effective);
         }
         groupScore = groupScore.setScale(1, RoundingMode.HALF_UP);
 
@@ -477,7 +496,7 @@ public class TeReviewServiceImpl implements ITeReviewService
         view.put("finalScore", score.getFinalScore());
         view.put("publishTime", score.getPublishTime());
         view.put("groupName", student.getGroupName());
-        // 2. 各模块终分（仅模块名/满分/终分，不含AI批改过程）
+        // 2. 各模块终分（模块名/满分/终分，均为"模块绝对分"口径，≤模块满分；不含AI批改过程）
         List<Map<String, Object>> modules = new ArrayList<>();
         for (TeAiReview r : aiReviewMapper.selectByGroup(student.getGroupId()))
         {
@@ -485,6 +504,7 @@ public class TeReviewServiceImpl implements ITeReviewService
             m.put("moduleCode", r.getModuleCode());
             m.put("moduleName", MODULE_NAMES[(int) Math.max(0, Math.min(MODULE_NAMES.length - 1, r.getModuleCode()))]);
             m.put("moduleMax", r.getModuleMax());
+            // 模块终分 = 生效分（教师核定分优先，缺省用AI参考分），已是绝对分直接透出
             m.put("finalScore", r.getTeacherScore() != null ? r.getTeacherScore() : r.getAiScore());
             modules.add(m);
         }

@@ -28,7 +28,7 @@
           <el-card shadow="never" class="score-card">
             <p class="card-label">小组最终分</p>
             <p class="card-num group">{{ view.groupScore }}<span class="card-unit">分</span></p>
-            <p class="card-desc">小组最终分 = 6 个计分模块生效分之和（满分 100）</p>
+            <p class="card-desc">小组最终分 = 各计分模块生效分（模块得分）之和（满分 100）</p>
           </el-card>
         </el-col>
         <el-col :span="12">
@@ -62,7 +62,7 @@
         </el-table>
         <div class="tip-bar">
           <span class="tip-dot"></span>
-          <span>本模块我的得分 = 模块满分 × 生效分% × 本人贡献率%；各模块合计即个人最终得分。</span>
+          <span>本模块我的得分 = 模块生效分（模块得分）× 本人贡献率%；各模块合计即个人最终得分。</span>
         </div>
       </el-card>
     </template>
@@ -88,9 +88,9 @@ const mergedRows = computed(() => {
   const contribMap = new Map((view.value.contributions || []).map(c => [c.moduleCode, c.ratio]))
   return mods.map(m => {
     const ratio = contribMap.get(m.moduleCode)
-    // 折算本模块个人得分 = 模块满分 × 生效分% × 本人贡献率%（保留1位；与后端汇总口径一致）
-    const earned = (ratio != null && m.finalScore != null && m.moduleMax != null)
-      ? (Number(m.moduleMax) * Number(m.finalScore) / 100 * Number(ratio) / 100).toFixed(1) : null
+    // 折算本模块个人得分 = 模块生效分（已是模块得分绝对分）× 本人贡献率%（保留1位；与后端汇总口径一致）
+    const earned = (ratio != null && m.finalScore != null)
+      ? (Number(m.finalScore) * Number(ratio) / 100).toFixed(1) : null
     return { ...m, ratio, myEarned: earned }
   })
 })

@@ -10,10 +10,10 @@ import com.fasterxml.jackson.annotation.JsonFormat;
  * 【功能】AI批改结果实体（对应表 te_ai_review）
  * ----------------------------------------------------------------------------
  * 【说明】阶段7核心表：每组 × 每计分模块（5-10）一条批改记录。
- *         - ai_score：AI给出的百分制参考分（0-100）
+ *         - ai_score：AI给出的模块参考分（按模块满分折算后的绝对分，≤模块满分）
  *         - review_process：批改过程 JSON（优点/问题/修改建议，教师可见可核查）
  *         - model_name：批改来源标识（模型名 / rule-sim 本地规则模拟）
- *         - teacher_score：教师终审核定分（NULL 表示未调整，取分时优先于 AI 分）
+ *         - teacher_score：教师终审核定分（同口径绝对分，NULL 表示未调整，取分时优先于 AI 分）
  *         - similarity：与参考答案相似度（暂无参考答案数据时为 NULL）
  *         - moduleName / moduleMax 为联查展示字段（不落库）
  * ============================================================================
@@ -34,7 +34,7 @@ public class TeAiReview implements Serializable
     /** 批改过程（JSON：优点/问题定位/修改建议） */
     private String reviewProcess;
 
-    /** AI参考分（百分制 0-100） */
+    /** AI参考分（按模块满分折算后的绝对分，≤模块满分） */
     private BigDecimal aiScore;
 
     /** 与参考答案相似度（0-100，无参考答案时为空） */
@@ -64,7 +64,7 @@ public class TeAiReview implements Serializable
     /** 模块满分值（联查 te_module_score_set） */
     private BigDecimal moduleMax;
 
-    /** 生效分（teacher_score 优先，否则 ai_score；前端展示用） */
+    /** 生效分（teacher_score 优先，否则 ai_score；均为模块绝对分，前端展示用） */
     public BigDecimal getFinalScore()
     {
         return teacherScore != null ? teacherScore : aiScore;
