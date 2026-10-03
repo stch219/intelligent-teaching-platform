@@ -1,11 +1,13 @@
 <template>
   <section class="app-main">
+    <!-- 路由出口：仅保留 keep-alive 页面缓存。
+         【修复】原先外层包 <transition mode="out-in"> 页面切换动画，与 KeepAlive +
+         异步路由组件组合在切换时存在竞态（旧页面 leave 无法结束、新页面永不进入），
+         表现为点击菜单后内容区空白/残留旧页，故移除切换动画保切换稳定 -->
     <router-view v-slot="{ Component, route }">
-      <transition name="fade-transform" mode="out-in">
-        <keep-alive :include="tagsViewStore.cachedViews">
-          <component v-if="!route.meta.link" :is="Component" :key="route.path"/>
-        </keep-alive>
-      </transition>
+      <keep-alive :include="tagsViewStore.cachedViews">
+        <component v-if="!route.meta.link" :is="Component" :key="route.path"/>
+      </keep-alive>
     </router-view>
     <iframe-toggle />
     <copyright />

@@ -180,7 +180,9 @@ watch(() => navType, val => {
     appStore.toggleSideBarHide(true)
   }
   if ([1, 3].includes(val.value)) {
-      permissionStore.setSidebarRouters(permissionStore.defaultRoutes)
+      // 【端侧菜单隔离】恢复侧边栏菜单必须用按角色过滤后的快照 sidebarDefault，
+      // 不能用 defaultRoutes（含全量 constantRoutes，会让管理员混入教师/学生门户菜单）
+      permissionStore.setSidebarRouters(permissionStore.sidebarDefault)
   }
   }, { immediate: true, deep: true }
 )

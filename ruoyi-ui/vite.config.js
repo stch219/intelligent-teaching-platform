@@ -45,6 +45,12 @@ export default defineConfig(({ mode, command }) => {
       port: 80,
       host: true,
       open: true,
+      // 【开发环境禁用HTTP缓存】所有dev响应带 no-store：
+      // ① 源码改动立即生效，浏览器不会因 304/内存缓存加载旧模块
+      // ② 生产构建文件名带 hash 无缓存问题，此配置仅作用于 npm run dev
+      headers: {
+        'Cache-Control': 'no-store'
+      },
       proxy: {
         // https://cn.vitejs.dev/config/#server-proxy
         '/dev-api': {

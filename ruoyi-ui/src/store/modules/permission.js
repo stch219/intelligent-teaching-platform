@@ -1,3 +1,4 @@
+// 【端侧菜单隔离 v2】generateRoutes 中按角色过滤门户静态路由（/teacher /student）
 import auth from '@/plugins/auth'
 import router, { constantRoutes, dynamicRoutes } from '@/router'
 import { getRouters } from '@/api/menu'
@@ -17,7 +18,12 @@ const usePermissionStore = defineStore(
       addRoutes: [],
       defaultRoutes: [],
       topbarRouters: [],
-      sidebarRouters: []
+      sidebarRouters: [],
+      // 【端侧菜单隔离】按角色过滤后的侧边栏默认菜单快照：
+      // 供 Settings 切换导航类型（navType 1/3）时恢复菜单用——
+      // 不能直接用 defaultRoutes（它含全量 constantRoutes，会让管理员混入教师/学生门户菜单；
+      // 且 Breadcrumb 面包屑匹配依赖 defaultRoutes 的全量路由，故不改其语义，单独存一份）
+      sidebarDefault: []
     }),
     actions: {
       setRoutes(routes) {
@@ -47,14 +53,16 @@ const usePermissionStore = defineStore(
             asyncRoutes.forEach(route => { router.addRoute(route) })
             this.setRoutes(rewriteRoutes)
             // 门户静态路由按角色过滤后再进侧边栏：
-            // 带 meta.roles 的路由仅当用户角色命中时显示（admin 超管全可见）
+            // 带 meta.roles 的路由仅当用户角色命中时显示
+            // （【修复】原先 admin 超管被特殊放行导致管理员侧边栏混入教师/学生门户菜单）
             const myRoles = (roles && roles.length) ? roles : useUserStore().roles
             const visibleConst = constantRoutes.filter(rt => {
               if (!rt.meta || !rt.meta.roles) return true
-              if (myRoles.includes('admin')) return true
               return rt.meta.roles.some(r => myRoles.includes(r))
             })
             this.setSidebarRouters(visibleConst.concat(sidebarRoutes))
+            // 保存过滤后的侧边栏默认菜单快照（Settings 导航类型切换时恢复用）
+            this.sidebarDefault = visibleConst.concat(sidebarRoutes)
             this.setDefaultRoutes(sidebarRoutes)
             this.setTopbarRoutes(defaultRoutes)
             resolve(rewriteRoutes)
