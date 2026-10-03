@@ -19,6 +19,16 @@ const isWhiteList = (path) => {
   return whiteList.some(pattern => isPathMatch(pattern, path))
 }
 
+/**
+ * 【端访问隔离】按角色返回各自门户首页：
+ * 教师→教师工作台；学生→学生工作台；管理员→管理员首页（若依 /index）
+ */
+const portalHome = (roles) => {
+  if (roles.includes('teacher')) return '/teacher/index'
+  if (roles.includes('student')) return '/student/index'
+  return '/index'
+}
+
 router.beforeEach(async (to, from) => {
   NProgress.start()
   if (getToken()) {
@@ -52,23 +62,38 @@ router.beforeEach(async (to, from) => {
             router.addRoute(route)
           }
         })
-        // 按角色门户分流：教师进入教师门户，学生进入学生门户（不进入若依后台首页）
-        const roles = useUserStore().roles
-        if (roles.includes('teacher') && (to.path === '/' || to.path === '/index')) {
-          NProgress.done()
-          return { path: '/teacher/index', replace: true }
-        }
-        if (roles.includes('student') && (to.path === '/' || to.path === '/index')) {
-          NProgress.done()
-          return { path: '/student/index', replace: true }
-        }
-        // 重新导航到目标路由，确保动态路由已注册
+        // 重新导航到目标路由，确保动态路由已注册；
+        // 教师/学生的门户分流在下方统一执行（login.vue 已提前拉取过 roles 时
+        // 本分支不会进入，分流逻辑不能只写在这里，否则首页登录会被带到 /index）
         return { ...to, replace: true }
       } catch (err) {
         await useUserStore().logOut()
         ElMessage.error(err)
         return { path: '/' }
       }
+    }
+    // 【门户分流】按角色门户分流：教师进入教师门户，学生进入学生门户
+    // （不进入管理员首页 /index）；管理员无需分流，/index 即管理员首页。
+    // 每次导航都判断，兼容 roles 已提前加载（登录页校验时拉取过）的场景
+    const currentRoles = useUserStore().roles
+    if (to.path === '/' || to.path === '/index') {
+      if (currentRoles.includes('teacher') || currentRoles.includes('student')) {
+        NProgress.done()
+        return { path: portalHome(currentRoles), replace: true }
+      }
+    }
+    // 【端访问隔离】教师/学生门户按角色准入，越端访问一律弹回各自门户首页：
+    // meta.roles 只能过滤侧边栏菜单、拦不住导航，因此手输 URL 或登录后残留的
+    // redirect 参数（如 /login?redirect=/student/index）会把账号带进他端页面
+    //（曾致管理员落入学生工作台报"当前账号没有学生档案"），此处做统一拦截
+    if (to.path.startsWith('/student') && !currentRoles.includes('student')) {
+      NProgress.done()
+      return { path: portalHome(currentRoles), replace: true }
+    }
+    // 教师门户允许管理员进入：管理员首页「课程设计管理」快捷入口按设计指向教师门户
+    if (to.path.startsWith('/teacher') && !currentRoles.includes('teacher') && !currentRoles.includes('admin')) {
+      NProgress.done()
+      return { path: portalHome(currentRoles), replace: true }
     }
     return true
   } else {

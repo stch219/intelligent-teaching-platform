@@ -184,7 +184,23 @@ function handleLogin() {
         Cookies.remove("rememberMe")
       }
       // 调用 action 的登录方法（登录后按 redirect 或进入系统首页）
-      userStore.login(loginForm.value).then(() => {
+      userStore.login(loginForm.value).then(async () => {
+        // 【端入口与角色匹配校验】认证通过后拉取账号实际角色，与登录页所选端入口比对：
+        // 各端账号与入口一一隔离（管理员/教师/学生只能从对应端入口登录），
+        // 防止用管理员账号在学生端/教师端入口登录后进入错误端的页面
+        await userStore.getInfo()
+        const roles = userStore.roles || []
+        if (!roles.includes(role.value)) {
+          const entryName = currentRole.value ? currentRole.value.name : role.value
+          // 退出本次登录（清 token 与缓存），刷新验证码供换正确入口重试
+          await userStore.logOut()
+          loading.value = false
+          if (captchaEnabled.value) {
+            getCode()
+          }
+          proxy.$modal.msgError(`账号「${loginForm.value.username}」没有${entryName}权限，请选择正确的端入口登录`)
+          return
+        }
         const query = route.query
         const otherQueryParams = Object.keys(query).reduce((acc, cur) => {
           if (cur !== "redirect") {
